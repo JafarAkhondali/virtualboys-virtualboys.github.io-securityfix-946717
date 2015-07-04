@@ -434,7 +434,7 @@
 				rgbshifttex.anisotropy = 16;
 				textures[0] = rgbshifttex;
 
-				tex2 = THREE.ImageUtils.loadTexture( 'textures/squares.jpg', {}, texLoadCallback);
+				tex2 = THREE.ImageUtils.loadTexture( 'textures/squaressmall.jpg', {}, texLoadCallback);
 				tex2.anisotropy = 16;
 				textures[1] = tex2;
 
@@ -442,7 +442,7 @@
 				tex3.anisotropy = 16;
 				textures[2] = tex3;
 
-				var tex4 = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
+				var tex4 = THREE.ImageUtils.loadTexture( 'textures/rectanglessmall.jpg', {}, texLoadCallback);
 				tex4.anisotropy = 16;
 				textures[3] = tex4;
 
@@ -450,7 +450,7 @@
 				tex5.anisotropy = 16;
 				textures[4] = tex5;
 
-				var tex6 = THREE.ImageUtils.loadTexture( 'textures/8=D.jpg', {}, texLoadCallback);
+				var tex6 = THREE.ImageUtils.loadTexture( 'textures/8=Dsmall.jpg', {}, texLoadCallback);
 				tex6.anisotropy = 16;
 				textures[5] = tex6;
 
@@ -485,7 +485,7 @@
 				backgroundTex.animated = true;
 				backgroundTexs[3]= backgroundTex;
 
-				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/rectanglessmall.jpg', {}, texLoadCallback);
 				backgroundTex.anisotropy = 16;
 				backgroundTex.animated = false;
 				backgroundTexs[4]= backgroundTex;
@@ -548,7 +548,7 @@
 					initShadedScene();
 					initTetScene();
 					initBackground();
-					setPreset(3);
+					setPreset(currentPreset);
 					animate();
 				}
 			}
@@ -572,7 +572,8 @@
 					foreground: 	1,
 					background: 	2,
 					currentScene: 	2,
-					textures: 		[4,4]
+					textures: 		[4,4],
+					colorInds: 		[0,0,0]
 				};
 				presets[1] = {
 					hue: 			0.564,
@@ -591,7 +592,8 @@
 					foreground: 	1,
 					background: 	1,
 					currentScene: 	0,
-					textures: 		[4,4]
+					textures: 		[4,4],
+					colorInds: 		[0,0,0]
 				};
 				presets[2] = {
 					hue: 			0.666,
@@ -610,7 +612,8 @@
 					foreground: 	-1,
 					background: 	1,
 					currentScene: 	1,
-					textures: 		[4,7]
+					textures: 		[4,7],
+					colorInds: 		[0,0,0]
 				};
 				presets[3] = {
 					hue: 			0.666,
@@ -629,7 +632,28 @@
 					foreground: 	-1,
 					background: 	1,
 					currentScene: 	3,
-					textures: 		[4,7]
+					textures: 		[4,7],
+					colorInds: 		[0,0,0]
+				};
+				presets[4] = {
+					hue: 			0.877,
+					opacity: 		1,
+					animSpeed: 		.73,
+					sceneRotation: 	.65,
+					zoom: 			.323,
+					obVel: 			.257,
+					obScale: 		1,
+					obRot: 			1,
+					rgbShift: 		1,
+					pixelate: 		.421,
+					activeEffects: 	[0,1],
+					colorScheme: 	1,
+					colorVariation: 3,
+					foreground: 	-1,
+					background: 	-1,
+					currentScene: 	2,
+					textures: 		[9,3],
+					colorInds: 		[0,0,0]
 				};
 			}
 
@@ -662,8 +686,13 @@
 				updateTextureSelect(sceneShaded);
 				updateTextureSelect(sceneTet);
 
-				if(p.background == -1)
+				// setColorInds(p.colorInds, sceneTorus);
+				// setColorInds(p.colorInds, sceneTorus2);
+
+				if(p.background == -1) {
 					background.on = false;
+					background.children[0].material.uniforms["texMap"].value= backgroundTexs[0]; 
+				}
 				else {
 	            	background.on = true;
 	            	backgroundInd=p.background;
@@ -694,6 +723,59 @@
             	}
 			}
 			
+			function savePreset() {
+				var preset = {
+					hue: 			keyMap.Q.value,
+					opacity: 		keyMap.W.value,
+					animSpeed: 		keyMap.E.value,
+					sceneRotation: 	keyMap.R.value,
+					zoom: 			keyMap.T.value,
+					obVel: 			keyMap.Z.value,
+					obScale: 		keyMap.X.value,
+					obRot: 			keyMap.C.value,
+					rgbShift: 		keyMap.U.value,
+					pixelate: 		keyMap.P.value,
+					colorScheme: 	currentScheme,
+					colorVariation: currentVariation,
+					currentScene: 	currentScene,
+					textures: 		[],
+					activeEffects:  [],
+					colorInds: 		[],
+				};
+
+				for(var i = 0; i < activeEffects.length; i++)
+					if(activeEffects[i])
+						preset.activeEffects.push(i);
+
+				if(!background.on)
+					preset.background = -1;
+				else
+					preset.background = backgroundInd;
+
+				if(!foreground.on)
+					preset.foreground = -1;
+				else
+					preset.foreground = foregroundInd;
+
+				preset.textures[0] = textureSelect.selected[0];
+				preset.textures[1] = textureSelect.selected[1];
+
+				var cScene = getCurrentScene();
+				if(!cScene.children[0].textured) {
+					for(var i = 0; i < 3; i++) {
+						preset.colorInds[i] = cScene.children[i].colorind;
+					}
+				}
+
+				console.log(preset);
+			}
+
+			function setColorInds(inds, scene) {
+        		for(var i = 0; i < 3; i++) {
+        			var ob = scene.children[i];
+	        		ob.colorind = inds[i];
+        		}
+			}
 
 			function initBackground() {
 				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
@@ -1703,6 +1785,8 @@
 		document.addEventListener('keydown', function(event) {
 			var keyString = String.fromCharCode(event.keyCode);
 
+			if(keyString == "S")
+				savePreset();
 			if(keyString == "H")
 				showHelp();
 			if(keyString == "F"){
@@ -1719,6 +1803,7 @@
 			}
 
 			var dir = 0;
+			//left right
 			if(event.keyCode==37 || event.keyCode==39) {
 				dir = (event.keyCode == 39) ? 1 : -1;
 				if(currentKey != "") {
@@ -1732,8 +1817,16 @@
 					}
 				}
 			}
-
-			else if(event.keyCode==38){
+			//up down
+			else if(event.keyCode==38 || event.keyCode == 40){
+				if(event.keyCode==38) {
+					currentPreset = (++currentPreset) % presets.length;
+				} else {
+					currentPreset--;
+					if(currentPreset < 0)
+						currentPreset = presets.length-1;
+				}
+				setPreset(currentPreset);
 			}
 			else if(keyMap[keyString]) {
 				currentKey = keyString;
