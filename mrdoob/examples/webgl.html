@@ -756,7 +756,7 @@
 				tet1 = new THREE.Mesh( geometry, mat1 );
 				tet1.textured = true;
 				tet1.position.set( 100, 0, 100 );
-				tet1.scale.set( 1,1,1 );
+				tet1.scale.set( 5,5,5 );
 
 				tet1.p1 = tet1.position.clone();
 				tet1.p2 = (new THREE.Vector3(300,0,0)).add(tet1.position);
@@ -774,7 +774,7 @@
 				mat1 = genTexturedMat(textures[1], new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1));
 				var tet2 = new THREE.Mesh( geometry, mat1 );
 				tet2.position.set( 200, 200, 100 );
-				tet2.scale.set( 2.7, 2.7, 2.7 );
+				tet2.scale.set( 6, 6, 6 );
 				tet2.textured=true;
 
 				tet2.p1 = tet2.position.clone();
