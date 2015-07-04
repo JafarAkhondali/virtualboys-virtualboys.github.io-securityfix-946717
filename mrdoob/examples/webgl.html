@@ -628,7 +628,7 @@
 					colorVariation: 0,
 					foreground: 	-1,
 					background: 	1,
-					currentScene: 	0,
+					currentScene: 	3,
 					textures: 		[4,7]
 				};
 			}
@@ -846,7 +846,7 @@
 			}
 
 			function initTorusScene() {
-				var geometry = new THREE.TorusGeometry(110,20,32,32);
+				var geometry = new THREE.TorusGeometry(170,30,32,32);
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 
@@ -866,7 +866,7 @@
 
 				sceneTorus.add( torus );
 
-				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var geometry = new THREE.TorusGeometry( 120, 40, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -882,22 +882,25 @@
 				setupMoveOb(torus);
 
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
-				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				var geometry = new THREE.SphereGeometry( 70, 32, 32 );
+				var material = new THREE.MeshLambertMaterial( {color: 0x5C80FF,shading:THREE.FlatShading} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				geometry = new THREE.BoxGeometry(200,200,200);
+				geometry = new THREE.TetrahedronGeometry(150,1);
 				var sphere = new THREE.Mesh( geometry, material );
 				//sphere.textured=true;
 				sphere.position.set(100,50,100);
 				sphere.scale.set(2.2,2.2,2.2);
 				sphere.baseScale = 2.2;
-				sphere.rotSpeed =0;
+				sphere.rotAxis = new THREE.Vector3(1,1,0).normalize();
+				sphere.rotSpeed =.1;
 				sphere.p1= new THREE.Vector3(300,20,100);
 				sphere.p2= new THREE.Vector3(-300,-20,100);
 				sphere.speed=1;
 				setupMoveOb(sphere);
 
 				sceneTorus.add( sphere );
-				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var geometry = new THREE.TorusGeometry( 120, 40, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -912,7 +915,8 @@
 				torus.speed=2;
 				setupMoveOb(torus);
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var geometry = new THREE.SphereGeometry( 70, 32, 32 );
+				//geometry = new THREE.CubeGeometry(70);
 				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var sphere = new THREE.Mesh( geometry, material );
@@ -926,6 +930,14 @@
 				sphere.speed=1.4;
 				setupMoveOb(sphere);
 				sceneTorus.add( sphere );
+
+				var light = new THREE.DirectionalLight( 0xffffff, 1);
+				light.position.set(1,0,0);
+				sceneTorus.add(light);
+
+				light = new THREE.AmbientLight(0x404040);
+				sceneTorus.add(light);
+
 				scheme = new ColorScheme;
  				scheme.from_hue(hue) 
  				.scheme(schemes[currentScheme])   
