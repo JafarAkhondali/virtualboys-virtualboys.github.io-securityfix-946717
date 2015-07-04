@@ -651,7 +651,7 @@
 
 				scheme.sc = schemes[currentScheme];
 				scheme.variation = variations[currentVariation];
-				initColorScheme(scenes[(currentScene+1) % scenes.length], scheme);
+				initColorScheme(getCurrentScene(), scheme);
 				textureSelect.selected[0] = p.textures[0];
 				textureSelect.selected[1] = p.textures[1];
 
@@ -846,7 +846,8 @@
 			}
 
 			function initTorusScene() {
-				var geometry = new THREE.TorusGeometry(170,30,32,32);
+				var tSceneScale = 2;
+				var geometry = new THREE.TorusGeometry(tSceneScale * 170,tSceneScale * 30,32,32);
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 
@@ -866,7 +867,7 @@
 
 				sceneTorus.add( torus );
 
-				var geometry = new THREE.TorusGeometry( 120, 40, 32,32 );
+				var geometry = new THREE.TorusGeometry( tSceneScale * 120, tSceneScale * 40, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -882,11 +883,11 @@
 				setupMoveOb(torus);
 
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( 70, 32, 32 );
+				var geometry = new THREE.SphereGeometry( tSceneScale * 70, 32, 32 );
 				var material = new THREE.MeshLambertMaterial( {color: 0x5C80FF,shading:THREE.FlatShading} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				geometry = new THREE.BoxGeometry(200,200,200);
-				geometry = new THREE.TetrahedronGeometry(150,1);
+				geometry = new THREE.TetrahedronGeometry(tSceneScale * 150,1);
 				var sphere = new THREE.Mesh( geometry, material );
 				//sphere.textured=true;
 				sphere.position.set(100,50,100);
@@ -900,7 +901,7 @@
 				setupMoveOb(sphere);
 
 				sceneTorus.add( sphere );
-				var geometry = new THREE.TorusGeometry( 120, 40, 32,32 );
+				var geometry = new THREE.TorusGeometry( tSceneScale * 120, tSceneScale * 40, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -915,7 +916,7 @@
 				torus.speed=2;
 				setupMoveOb(torus);
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( 70, 32, 32 );
+				var geometry = new THREE.SphereGeometry( tSceneScale * 70, 32, 32 );
 				//geometry = new THREE.CubeGeometry(70);
 				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
@@ -1201,6 +1202,21 @@
 					}
 				}
 			}
+
+			function incColorInd(ob, scheme) {
+				var schemenew = new ColorScheme;
+				schemenew.from_hue(lerps[2].current) 
+ 				.scheme(scheme.sc)   
+        		.variation(scheme.variation);
+        		schemenew.hue=lerps[2].current;
+        		schemenew.sc=scheme.sc;
+        		schemenew.variation=scheme.variation;
+        		scheme=schemenew;
+
+        		ob.colorind += 4;
+        		ob.colorind = ob.colorind % scheme.colors().length;
+			}
+
 			function hexToRgb(hex) {
     			var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     			return result ? {
@@ -1208,6 +1224,10 @@
         			g: (parseInt(result[2], 16))/256.0,
         			b: (parseInt(result[3], 16))/256.0
     			} : null;
+			}
+
+			function getCurrentScene() {
+				return scenes[(currentScene+1) % scenes.length];
 			}
 
 			function initKaleidescopeScene() {
@@ -1764,8 +1784,15 @@
         textureSelect.selected[1]=0;
         textureSelect.selected[2]=0;
 
+        
+
 		//keys that cycle through values
 		function cycleEvent(key) {
+			var scene = getCurrentScene();
+	        var isTexturedScene = false;
+	        if(scene == sceneTet || scene == sceneShaded)
+	        	isTexturedScene = true;
+
 			if(key == "1") {
 				currentScheme = (currentScheme+1) % schemes.length;
 	            scheme.sc = schemes[currentScheme];
@@ -1823,17 +1850,29 @@
                 		updateTextures(sceneShaded);
                 }
 			} else if(key == "8") {
-				textureSelect.selected[0]=(++textureSelect.selected[0])%10;
-				updateTextureSelect(sceneShaded);
-				updateTextureSelect(sceneTet);
+				if(!isTexturedScene) {
+					incColorInd(scene.children[0], scheme);
+				} else {
+					textureSelect.selected[0]=(++textureSelect.selected[0])%10;
+					updateTextureSelect(sceneShaded);
+					updateTextureSelect(sceneTet);
+				}
 			} else if(key == "9") {
-				textureSelect.selected[1]=(++textureSelect.selected[1])%10;
-				updateTextureSelect(sceneShaded);
-				updateTextureSelect(sceneTet);
+				if(!isTexturedScene) {
+					incColorInd(scene.children[1], scheme);
+				} else {
+					textureSelect.selected[1]=(++textureSelect.selected[1])%10;
+					updateTextureSelect(sceneShaded);
+					updateTextureSelect(sceneTet);
+				}
 			} else if(key == "0") {
-				textureSelect.selected[2]=(++textureSelect.selected[2])%10;
-				updateTextureSelect(sceneShaded);
-				updateTextureSelect(sceneTet);
+				if(!isTexturedScene) {
+					incColorInd(scene.children[2], scheme);
+				} else {
+					textureSelect.selected[2]=(++textureSelect.selected[2])%10;
+					updateTextureSelect(sceneShaded);
+					updateTextureSelect(sceneTet);
+				}
 			}
 		}
 
