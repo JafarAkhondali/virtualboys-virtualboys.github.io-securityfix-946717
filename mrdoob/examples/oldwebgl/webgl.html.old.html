@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+	<head>
+		<title>three.js webgl - render-to-texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #ffffff;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 5px;
+			}
+
+			a {
+				color: #ffffff;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		<div id="info" ><a href="http://threejs.org" target="_blank">three.js</a> render-to-texture webgl example</div>
+
+		<script src="../build/three.min.js"></script>
+
+		<script src="js/Detector.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+		<script id="fragment_shader_screen" type="x-shader/x-fragment">
+
+			varying vec2 vUv;
+			uniform int slices;
+			uniform sampler2D tDiffuse;
+
+			void main() {
+				vec2 p = vUv - 0.5;
+				float r = length(p);
+   				float a = atan(p.y, p.x);
+    			float tau = 2.0 * 3.1416;
+    			float s= float(slices);
+    			a = mod(a, tau/s);
+    			a = abs(a - tau/s/2.0);
+    			vec2 position = r * vec2(cos(a), sin(a)) + 0.5;
+				gl_FragColor = texture2D( tDiffuse, position+.01);
+				//gl_FragColor = texture2D(tDiffuse, vUv);
+				if(gl_FragColor.a == 0.0)
+					gl_FragColor.r = 0.0;
+				gl_FragColor = texture2D( tDiffuse, vUv);
+				//gl_FragColor = vec4(.5,.3,.4,1);
+
+
+
+			}
+
+		</script>
+
+		<script id="fragment_shader_pass_1" type="x-shader/x-fragment">
+
+			varying vec2 vUv;
+			uniform float time;
+
+			void main() {
+
+				float r = vUv.x;
+				if( vUv.y < 0.5 ) r = 0.0;
+				float g = vUv.y;
+				if( vUv.x < 0.5 ) g = 0.0;
+
+				gl_FragColor = vec4( .7,.94,1, 1.0 );
+
+			}
+
+		</script>
+
+		<script id="vertexShader" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container, stats;
+
+			var cameraRTT, camera, sceneRTT, sceneScreen, scene, renderer, zmesh1, zmesh2,slices;
+			var sceneRTT2;
+			var materialScreen,materialScreen2;
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var rtTexture,rtTexture2, material, quad;
+
+			var delta = 0.01;
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.getElementById( 'container' );
+
+				//cameraRTT = new THREE.OrthographicCamera( window.innerWidth / - 2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+				cameraRTT = new THREE.OrthographicCamera( window.innerHeight / - 2, window.innerHeight / 2, window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+				//cameraRTT.position.z = 100;
+
+				//
+
+				scene = new THREE.Scene();
+				sceneRTT = new THREE.Scene();
+				sceneRTT2 = new THREE.Scene();
+				sceneScreen = new THREE.Scene();
+
+				var light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 0, 0, 1 ).normalize();
+				sceneRTT.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, 0, -1 ).normalize();
+				//sceneRTT.add( light );
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				sceneRTT.add( light );
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( -1, 0, 0 ).normalize();
+				//sceneRTT.add( light );
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, 1, 0 ).normalize();
+				sceneRTT.add( light );
+
+				rtTexture = new THREE.WebGLRenderTarget( window.innerHeight, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat } );
+				rtTexture2 = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight,{minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat})
+				slices=11;
+				slices2=6;
+				materialScreen = new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1.0,
+					uniforms: { tDiffuse: { type: "t", value: rtTexture}, slices: { type: "i", value : slices } },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+				materialScreen = new THREE.MeshBasicMaterial( { color: "rgb(0,200,200)", wireframe: false, transparent:true, side: THREE.DoubleSide } );
+				materialScreen2 = new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1.0,
+					uniforms: { tDiffuse: { type: "t", value: rtTexture2}, slices: { type: "i", value : slices2 } },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+
+				//var plane2 = new THREE.PlaneBufferGeometry(window.innerWidth/2,window.innerHeight/2);
+				//material = new THREE.MeshBasicMaterial({map:rtTexture});
+				//var planeOb = new THREE.Mesh(plane2, material);
+				//planeOb.position.set(0,0,100);
+				//sceneScreen.add(planeOb);
+				
+
+				var geometry = new THREE.TetrahedronGeometry( 100,1 );
+
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xEFD4FF,shading: THREE.FlatShading} );
+				var mat2 = new THREE.MeshBasicMaterial( { color: 0xD4FFEF,shading: THREE.FlatShading} );
+
+				zmesh1 = new THREE.Mesh( geometry, mat1 );
+				zmesh1.position.set( 100, 0, 100 );
+				zmesh1.scale.set( 3.4, 3.4, 3.4 );
+				sceneRTT.add( zmesh1 );
+
+				zmesh2 = new THREE.Mesh( geometry, mat2 );
+				zmesh2.position.set( 300, 300, 100 );
+				zmesh2.scale.set( 2.7, 2.7, 2.7 );
+				sceneRTT.add( zmesh2 );
+
+				initScene2();
+
+				initKaleidescopeScene();
+
+			
+
+				renderer = new THREE.WebGLRenderer({ alpha: true });
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.autoClear = false;
+
+				container.appendChild( renderer.domElement );
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				container.appendChild( stats.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+			}
+
+			var tet;
+			function initScene2() {
+				var geometry = new THREE.TetrahedronGeometry( 50,0 );
+
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xD4E4FF,shading: THREE.FlatShading} );
+
+				tet = new THREE.Mesh( geometry, mat1 );
+				tet.position.set( 100, 0, 100 );
+				tet.scale.set( 2.2, 2.2, 2.2 );
+				sceneRTT2.add( tet );
+			}
+			var material;
+			var geometry;
+			var strips;
+			var h2, w2;
+			function initKaleidescopeScene() {
+
+				h2 = 30*Math.sqrt(27);
+				w2 = 30*3;
+
+				geometry = new THREE.Geometry();
+				geometry.vertices.push(
+					new THREE.Vector3(0, h2, 0),
+					new THREE.Vector3(-w2, 0, 0 ),
+					new THREE.Vector3(w2, 0, 0 ),
+					new THREE.Vector3(0, -h2, 0)
+				);
+
+				geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
+				geometry.faces.push( new THREE.Face3( 3, 2, 1 ) );
+				var uvs = [];
+				uvs.push( new THREE.Vector2( 0.5, 0.0 ) );
+				uvs.push( new THREE.Vector2( 0.0, Math.sqrt(.75) ) );
+				uvs.push( new THREE.Vector2( 1.0, Math.sqrt(.75) ) );
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[1], uvs[2] ] );
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[2], uvs[1] ] );
+				material= new THREE.MeshBasicMaterial( { map: rtTexture, side: THREE.DoubleSide} );
+
+				var triangle = new THREE.Mesh( geometry, material);
+				triangle.position.set(0,0,100);
+
+				var geom2 = geometry.clone();
+				geom2.faceVertexUvs[0][0] = [ uvs[2], uvs[1], uvs[0] ];
+				geom2.faceVertexUvs[0][1] = [ uvs[2], uvs[0], uvs[1] ]; 
+				var tri2 = new THREE.Mesh( geom2, material);
+				tri2.position.set(w2,h2,100);
+				tri2.rotation.set(0,0,-Math.PI);
+
+				var geom3 = geometry.clone();
+				geom3.faceVertexUvs[0][0] = [ uvs[1], uvs[2], uvs[0] ];
+				geom3.faceVertexUvs[0][1] = [ uvs[1], uvs[0], uvs[2] ]; 
+				var tri3 = new THREE.Mesh( geom3, material);
+				tri3.position.set(2*w2,2*h2,100);
+				//tri3.rotation.set(0,0,-Math.PI);
+				//triangle.scale.set(30,30,30);
+
+				//tri3.rotateOnAxis(new THREE.Vector3(1,0,0), Math.PI);
+
+				var primitives = [triangle, tri2, tri3];
+				strips = [];
+
+				for(var j = 0; j < 20; j++){
+					strips[j] = [];
+					for(var i = 0; i < 8; i++) {
+						for(var n = 0; n < 3; n++) {
+							var p = primitives[n].clone();
+							p.position.add(new THREE.Vector3((3*(i-4)  )*w2, (3*(i-1) - 2*(j-10))*h2, 0));
+							sceneScreen.add(p);
+							strips[j][i*3 + n] = p;
+						}
+					}
+				}
+				//sceneScreen.add( triangle );
+				//sceneScreen.add(tri2);
+				//sceneScreen.add(tri3);
+			}
+
+			function translateStrip(strip, amt) {
+				for(var i = 0; i < strip.length; i++) {
+					strip[i].position.add(new THREE.Vector3(amt*w2,amt*h2,0));
+				}
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX );
+				mouseY = ( event.clientY - windowHalfY );
+
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+				stats.update();
+
+			}
+			var oTime = Date.now();
+			var tpassed;
+			var forward = true;
+			function render() {
+
+				var time = Date.now() * 0.0015;
+				tpassed = Date.now()-oTime;
+				//camera.position.x += ( mouseX - camera.position.x ) * .05;
+				//camera.position.y += ( - mouseY - camera.position.y ) * .05;
+
+				if(tpassed>800){
+					tpassed=0;
+					oTime=Date.now();
+					//materialScreen.uniforms.slices.value+=1;
+				}
+				//camera.lookAt( scene.position );
+
+				zmesh1.rotation.y = - time;
+				tet.rotation.y = -time;
+				//quad2.rotation.z = -time;
+
+				if(forward){
+					zmesh1.position.add(new THREE.Vector3(0,0,-1));
+					if(zmesh1.position.z < -400)
+						forward = false;
+				}
+				else {
+					zmesh1.position.add(new THREE.Vector3(0,0,1));
+					if(zmesh1.position.z > 100)
+						forward = true;
+				}
+				
+				zmesh2.rotation.y = - time + Math.PI / 2;
+
+				var trans = 1;
+				if(forward) {
+					trans = .005;
+				} else {
+					trans = -.005;
+				}
+
+				/*for(var i = 0; i < strips.length; i++) {
+					if(i%2 == 0) {
+						translateStrip(strips[i], trans);
+					} else {
+						translateStrip(strips[i], -trans);
+					}
+				}*/
+
+				renderer.setClearColor(0xFFFFCC,1);
+				renderer.clear();
+
+				//renderer.setClearColor(0x000000,0);
+				//renderer.setClearColor(0x000000,0);
+				//renderer.clear();
+
+				// Render first scene into texture
+
+				renderer.render( sceneRTT, cameraRTT, rtTexture, true );
+				//material.map.needsUpdate=true;
+				//renderer.render( sceneRTT2, cameraRTT, rtTexture2, true);
+
+				renderer.setClearColor(0xCCCCFF,1);
+				//renderer.clear();
+
+				// Render full screen quad with generated texture
+
+				renderer.render( sceneScreen, cameraRTT, null, true );
+
+				// Render second scene to screen
+				// (using first scene as regular texture)
+
+				//renderer.render( scene, camera );
+
+			}
+
+		</script>
+	</body>
+
+       <script src="/socket.io/socket.io.js"></script>
+       <script>
+         $(document).ready(function() {
+ 
+            console.log('wut'); 
+           var socket = io.connect('http://localhost:8080');
+           socket.on('message', function(message) {
+               console.log(message);
+               
+           });
+           $('#button').click(function(e){
+             socket.emit('click');
+             e.preventDefault();
+           });
+         });  
+       </script> 
+</html>

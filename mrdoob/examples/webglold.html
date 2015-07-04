@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - render-to-texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #ffffff;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 5px;
+			}
+
+			a {
+				color: #ffffff;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		
+		<script src="js/node_modules/color-scheme/lib/color-scheme.min.js"></script>
+		<script src="../build/three.min.js"></script>
+		<script src="js/shaders/CopyShader.js"></script>
+		<script src="js/shaders/DotScreenShader.js"></script>
+		<script src="js/shaders/RGBShiftShader.js"></script>
+		<script src="js/shaders/LensShader.js"></script>
+
+		<script src="/socket.io/socket.io.js"></script>
+
+		<script src="js/postprocessing/EffectComposer.js"></script>
+		<script src="js/postprocessing/RenderPass.js"></script>
+		<script src="js/postprocessing/MaskPass.js"></script>
+		<script src="js/postprocessing/ShaderPass.js"></script>
+
+		<script src="js/Detector.js"></script>
+
+		<script id="fragment_shader_screen" type="x-shader/x-fragment">
+
+			varying vec2 vUv;
+			uniform float cutoff1;
+			uniform float cutoff2;
+			uniform float time;
+			uniform vec4 baseColor;
+			uniform vec4 color1;
+			uniform vec4 color2;
+
+			uniform sampler2D texMap;
+
+			void main() {
+				vec2 uv = vec2(vUv.x, vUv.y);
+				uv.y +=time;
+				uv.y -= floor(uv.y);
+				vec4 texColor = texture2D( texMap, uv);
+				if(texColor.r <= cutoff1)
+					gl_FragColor = color2;
+				else if(texColor.r <= cutoff2)
+					gl_FragColor = color1;
+				else
+					gl_FragColor = baseColor;
+			}
+
+		</script>
+
+		<script id="vertexShader" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var cameraRTT, camera, camera2, renderer;
+			var sceneTet, sceneTorus, sceneIcos, sceneShaded;
+			var sceneScreen, sceneQuad, sceneQuad2;
+			var currentQuad = 1;
+			var sceneFade = 1;
+
+			var activeScenes = [];
+			var tet1, tet2, torus, icos;
+			var comp;
+			var strips;
+			var h2, w2;
+			var textures=[];
+			var aspect = window.innerWidth / window.innerHeight;
+			var camSize = 800;
+			var shaderMaterial;
+			var background;
+
+			var rgbTexture;
+			var finalTex;
+			var rtTexture, quadTex, quadTex2;
+			var rgbshifttex, tex2, backgroundTex;
+			var uniformsMaterialColor= ["baseColor","color1","color2"];
+			var effect,effect2;
+
+			var numTextures = 4;
+			var numTexLoaded = 0;
+
+			//inputs
+			var rotateSpeed = 0;
+			var zoomSpeed = 0;
+			var baseHue = 0;
+
+			var hue;
+			var schemes = ['triade','tetrade','analogic'];
+			var variations = ['pastel','soft','light','hard','pale'];
+			var currentScheme = 2;
+			var currentVariation = 2;
+
+			init();
+			//animate();
+
+			function init() {
+
+				cameraRTT = new THREE.OrthographicCamera( window.innerHeight / - 2, window.innerHeight / 2, 
+					window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+
+				camera = new THREE.OrthographicCamera( camSize / -2, camSize / 2, camSize / (2*aspect), 
+					camSize / (-2*aspect), -10000, 10000 );
+				camera2 = camera.clone();
+				cameraRTT = camera.clone();
+
+				sceneTet = new THREE.Scene();
+				sceneTet.update = updateTet;
+
+				sceneTorus = new THREE.Scene();
+				sceneTorus.update = updateTorus;
+
+				sceneIcos = new THREE.Scene();
+				sceneIcos.update = updateIcos;
+
+				sceneShaded = new THREE.Scene();
+				sceneShaded.update = updateShaded;
+
+				sceneScreen = new THREE.Scene();
+				sceneQuad = new THREE.Scene();
+				sceneQuad2 = new THREE.Scene();
+
+				activeScenes[0] = sceneShaded;
+
+				hue = Math.random() * 360;
+
+				initTextures();
+
+				initTorusScene2();
+				//initTorus();
+				initIcosScene();
+				loadTextures();
+
+				initKaleidescopeScene();
+
+				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
+				var mat = new THREE.MeshBasicMaterial({map:quadTex,transparent:true, depthWrite:false, depthTest: false});
+				var quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				sceneQuad.add(quadOb);
+
+				mat = new THREE.MeshBasicMaterial({map:quadTex2,transparent:true, depthWrite:false, depthTest: false});
+				quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				sceneQuad2.add(quadOb);
+
+				renderer = new THREE.WebGLRenderer({ alpha: true });
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.autoClear = false;
+
+				comp = new THREE.EffectComposer( renderer );
+				comp.addPass( new THREE.RenderPass( sceneQuad, cameraRTT ) );
+
+				effect = new THREE.ShaderPass( THREE.LensShader );
+				//effect.uniforms[ 'scale' ].value = 2.5;
+				effect.renderToScreen = true;
+				comp.addPass( effect );
+
+
+				//effect2 = new THREE.ShaderPass( THREE.RGBShiftShader );
+				//effect2.uniforms[ 'amount' ].value = 0.0775;
+				//effect2.renderToScreen = true;
+				//comp.addPass( effect2 );
+				var container = document.getElementById( 'container' );
+				container.appendChild( renderer.domElement );
+
+
+			}
+			addEventListener("click", function() {
+    var
+      el = document.documentElement
+    , rfs =
+           el.requestFullScreen
+        || el.webkitRequestFullScreen
+        || el.mozRequestFullScreen
+    ;
+    rfs.call(el);
+});
+			document.getElementById('container').onkeypress = function(event) {
+			}
+
+			function initTextures() {
+				rtTexture = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat } );
+				quadTex = rtTexture.clone();
+				finalTex= rtTexture.clone();
+
+			}
+
+
+			function loadTextures() {
+				rgbshifttex = THREE.ImageUtils.loadTexture( 'textures/stripes.png', {}, texLoadCallback);
+				rgbshifttex.wrapS = rgbshifttex.wrapT = THREE.RepeatWrapping;
+				rgbshifttex.anisotropy = 16;
+				textures[0] = rgbshifttex;
+
+				tex2 = THREE.ImageUtils.loadTexture( 'textures/cubes.jpg', {}, texLoadCallback);
+				tex2.wrapS = tex2.wrapT = THREE.RepeatWrapping;
+				tex2.anisotropy = 16;
+				textures[1] = tex2;
+
+				var tex3 = THREE.ImageUtils.loadTexture( 'textures/stripes.png', {}, texLoadCallback);
+				tex3.wrapS = tex3.wrapT = THREE.RepeatWrapping;
+				tex3.anisotropy = 16;
+				textures[2] = tex3;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/cubes.jpg', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+			}
+
+			function texLoadCallback() {
+				if(++numTexLoaded == numTextures) {
+					initShadedScene();
+					initTetScene();
+					initBackground();
+					animate();
+				}
+			}
+
+			function initBackground() {
+				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
+				var mat = new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1,
+					uniforms: { texMap: { type: "t", value: backgroundTex}, baseColor: { type: "v4", value : new THREE.Vector4(1, 1,1,1) }, 
+						color1: { type: "v4", value : new THREE.Vector4(1,.69,.4,1) }, color2: { type: "v4", value : new THREE.Vector4(1,.69,.4,1) }, 
+						cutoff1: { type:"1f", value: .3}, cutoff2: { type:"1f", value: .6}, time: { type:"1f", value: 0} },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+				var quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+
+				background = new THREE.Scene();
+				background.add(quadOb);
+			}
+
+			function genTexturedMat(texture, baseColor, color1, color2) {
+				return new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1.0,
+					uniforms: { texMap: { type: "t", value: texture}, baseColor: { type: "v4", value : baseColor }, 
+						color1: { type: "v4", value : color1 }, color2: { type: "v4", value : color2 }, cutoff1: { type:"1f", value: .1}, cutoff2: { type:"1f", value: .9}, time: { type:"1f", value: 0} },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+			}
+
+			function setupMoveOb(ob) {
+				ob.baseDist = new THREE.Vector3().subVectors(ob.p1,ob.p2).length();
+				ob.basePos = new THREE.Vector3().addVectors(ob.p1,ob.p2).divideScalar(2);
+				ob.transPos = true;
+			}	
+
+			var scheme;
+			function initTetScene() {
+
+				var geometry = new THREE.TetrahedronGeometry( 100,1 );
+
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xEFD4FF,shading: THREE.FlatShading} );
+				var mat2 = new THREE.MeshBasicMaterial( { color: 0xD4FFEF,shading: THREE.FlatShading} );
+
+				mat1 = genTexturedMat(textures[2], new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1));
+
+				tet1 = new THREE.Mesh( geometry, mat1 );
+				tet1.textured = true;
+				tet1.position.set( 100, 0, 100 );
+				tet1.scale.set( 2.4, 2.4, 2.4 );
+
+				tet1.p1 = tet1.position.clone();
+				tet1.p2 = (new THREE.Vector3(-25,0,-100)).add(tet1.position);
+				tet1.speed = .5;
+				setupMoveOb(tet1);
+
+				tet1.rotAxis = new THREE.Vector3(1,2,0).normalize();
+				tet1.rotSpeed = .01;
+
+				sceneTet.add( tet1 );
+
+				//scaleObDist(tet1, 4);
+
+				tet2 = new THREE.Mesh( geometry, mat2 );
+				tet2.position.set( 300, 300, 100 );
+				tet2.scale.set( 2.7, 2.7, 2.7 );
+
+				tet2.p1 = tet2.position.clone();
+				tet2.p2 = (new THREE.Vector3(100,25,50)).add(tet1.position);
+				tet2.speed = .02;
+				setupMoveOb(tet2);
+
+				tet2.rotAxis = new THREE.Vector3(0,1,0);
+				tet2.rotSpeed = -.02;
+
+				sceneTet.add( tet2 );
+
+				var light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 0, 0, 1 ).normalize();
+				//sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				//``sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, 1, 0 ).normalize();
+				//sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, -1, 0 ).normalize();
+				//sceneTet.add( light );
+
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneTet,scheme);
+
+			}
+
+			function initTorusScene2() {
+				var geometry = new THREE.TorusGeometry(110,20,32,32);
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+
+				torus = new THREE.Mesh(geometry, mat1);
+				//torus.textured=true;
+				torus.position.set(100,50,100);
+				torus.scale.set(2.2,2.2,2.2);
+				torus.rotSpeed = .014;
+				torus.rotAxis = new THREE.Vector3(.2,1,0).normalize();
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+				sceneTorus.add( torus );
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(100,50,100);
+				//torus.textured=true;
+				torus.scale.set(2.2,2.2,2.2);
+				torus.rotSpeed = .02;
+				torus.rotAxis = new THREE.Vector3(1,.2,0).normalize();
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+			    sceneTorus.add(torus);
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var sphere = new THREE.Mesh( geometry, material );
+				//sphere.textured=true;
+				sphere.position.set(100,50,100);
+				sphere.scale.set(2.2,2.2,2.2);
+				sphere.rotSpeed =0;
+				sphere.p1= new THREE.Vector3(300,20,100);
+				sphere.p2= new THREE.Vector3(-300,-20,100);
+				sphere.speed=1;
+				sceneTorus.add( sphere );
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(500,50,100);
+				//torus.textured=true;
+				torus.scale.set(2.2,2.2,2.2);
+				torus.rotSpeed = .03;
+				torus.rotAxis = new THREE.Vector3(.5,.5,0).normalize();
+				torus.p1= new THREE.Vector3(1000,50,100);
+				torus.p2= new THREE.Vector3(-1000,-50,100);
+				torus.speed=2;
+			    sceneTorus.add(torus);
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var sphere = new THREE.Mesh( geometry, material );
+				sphere.position.set(500,50,100);
+				sphere.scale.set(2.2,2.2,2.2);
+				//sphere.textured=true;
+				sphere.rotSpeed =0;
+				sphere.p1= new THREE.Vector3(1000,50,100);
+				sphere.p2= new THREE.Vector3(-1000,-50,100);
+				sphere.speed=1.4;
+				sceneTorus.add( sphere );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneTorus,scheme);
+        		//updateTextures(sceneTorus);
+			}
+
+			function initTorus(){
+				var geometry = new THREE.TorusGeometry( 60, 20, 16, 100 );
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0x44FA02,shading: THREE.FlatShading} );
+				torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(100,100,100);
+				torus.scale.set(2.2,2.2,2.2);
+				sceneTorus.add(torus);
+
+			}
+
+			function updateTorus() {
+				updateSceneObjects(sceneTorus);
+			}
+			function initIcosScene() {
+				var geom = new THREE.IcosahedronGeometry(200);
+				var mat = new THREE.MeshLambertMaterial({color:0xFFFFFF, shading: THREE.FlatShading});
+				icos = new THREE.Mesh(geom, mat);
+				icos.position.set(100,100,100);
+			
+				sceneIcos.add(icos);
+
+				var light = new THREE.DirectionalLight( 0xFFFFFF, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				sceneIcos.add( light );
+
+				light = new THREE.AmbientLight( 0x999999);
+				//sceneIcos.add( light );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneIcos,scheme);
+			}
+			function changeMap(mat,url){
+				rgbshifttex = THREE.ImageUtils.loadTexture( 'url', {}, texLoadCallback);
+				rgbshifttex.wrapS = rgbshifttex.wrapT = THREE.RepeatWrapping;
+				rgbshifttex.anisotropy = 16;
+
+			}
+			function initShadedScene() {
+
+				var mat = new THREE.MeshPhongMaterial( { alphaTest: 0.5, ambient: 0xffffff, color: 0xffffff, specular: 0x030303, emissive: 0x111111, shiness: 10, map: rgbshifttex, side: THREE.DoubleSide} );
+				mat = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+
+				var geom = new THREE.IcosahedronGeometry(700);
+
+				var icos = new THREE.Mesh(geom, mat);
+				icos.position.set(100,100,100);
+				icos.speed = 1;
+				icos.p1 = new THREE.Vector3(100,100,500);
+				icos.p2 = new THREE.Vector3(100,100,300);
+				setupMoveOb(icos);
+
+				icos.rotSpeed = .02;
+				icos.rotAxis = new THREE.Vector3(0,1,.5).normalize();
+				icos.textured =true;
+				sceneShaded.add(icos);
+
+				var mat2 = new THREE.MeshPhongMaterial( { alphaTest: 0.5, ambient: 0xffffff, color: 0xffffff, specular: 0x030303, emissive: 0x111111, shiness: 10, map: tex2, side: THREE.DoubleSide} );
+				mat2 = genTexturedMat(tex2, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(1,1,.7,1), new THREE.Vector4(1,.7,1,1));
+
+				var geom2 = new THREE.BoxGeometry(700, 700, 700);
+
+				var cube = new THREE.Mesh(geom2, mat2);
+				cube.position.set(100,100,500);
+				cube.speed = 0;
+				cube.rotSpeed = .01;
+				cube.rotAxis = new THREE.Vector3(1, 1, 0).normalize();
+				cube.textured=true;
+				sceneShaded.add(cube);
+
+				var light = new THREE.DirectionalLight( 0xFFFFFF, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				light.speed = 0;
+				light.rotSpeed = 0;
+				//sceneShaded.add( light );
+
+				light = new THREE.AmbientLight( 0xFFFFFF);
+				light.speed = 0;
+				light.rotSpeed = 0;
+				sceneShaded.add( light );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneShaded,scheme);
+        		updateTextures(sceneShaded);
+
+			}
+
+			function updateTextures(scene){
+				for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i] instanceof THREE.Mesh){
+						var t= Math.trunc(Math.random()*numTexLoaded);
+						scene.children[i].material.uniforms["texMap"].value= textures[t]; 
+					}
+				}
+			}
+			function initColorScheme(scene,scheme){ 
+				var baseind=4;
+				var colorind=baseind;
+				var schemenew = new ColorScheme;
+				schemenew.from_hue(scheme.hue) 
+ 				.scheme(scheme.sc)   
+        		.variation(scheme.variation);
+        		schemenew.hue=scheme.hue;
+        		schemenew.sc=scheme.sc;
+        		schemenew.variation=scheme.variation;
+        		scheme=schemenew;
+        		var colors = scheme.colors();				
+        		for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i] instanceof THREE.Mesh){
+
+						
+						if(scene.children[i].textured){
+							scene.children[i].colorinds=[];
+							for(var j=0; j<3; j++){
+								console.log(colors);
+								colorind = Math.floor(Math.random()*colors.length/4);
+								colorind *=4;
+								colorind+=0;
+								var rgb=hexToRgb(colors[colorind]);
+
+								
+								//if(rgb.r >= 0.2 && rgb.g >= 0.2 && rgb.b >= 0.2)
+								//	scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(0,0,0,0);
+								//else
+									scene.children[i].colorinds[j]=colorind;
+									scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,1);
+							}
+						}
+						else{
+							colorind = Math.floor(Math.random()*colors.length);
+							var rgb=hexToRgb(colors[colorind]);	
+							scene.children[i].colorind=colorind;
+							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
+						}	
+					}
+				}
+				scene.clearColor = hexToRgb(colors[colorind]);
+			}
+			function updateColorScheme(scene,scheme){
+				var schemenew = new ColorScheme;
+				schemenew.from_hue(scheme.hue) 
+ 				.scheme(scheme.sc)   
+        		.variation(scheme.variation);
+        		schemenew.hue=scheme.hue;
+        		schemenew.sc=scheme.sc;
+        		schemenew.variation=scheme.variation;
+        		scheme=schemenew;
+        		var colors = scheme.colors();	
+        		for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i] instanceof THREE.Mesh){
+						if(scene.children[i].textured){
+							for(var j=0; j<3; j++){
+								var colorind = scene.children[i].colorinds[j];
+								var rgb=hexToRgb(colors[colorind]);
+								scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,1);
+							}
+						}
+						else{
+							var colorind = scene.children[i].colorind;
+							var rgb=hexToRgb(colors[colorind]);	
+							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
+						}	
+					}
+				}
+
+			}
+			function hexToRgb(hex) {
+    			var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    			return result ? {
+        			r: (parseInt(result[1], 16))/256.0,
+        			g: (parseInt(result[2], 16))/256.0,
+        			b: (parseInt(result[3], 16))/256.0
+    			} : null;
+			}
+
+			function initKaleidescopeScene() {
+
+				h2 = 30*Math.sqrt(27);
+				w2 = 30*3;
+
+				var geometry = new THREE.Geometry();
+				geometry.vertices.push(
+					new THREE.Vector3(0, h2, 0),
+					new THREE.Vector3(-w2, 0, 0 ),
+					new THREE.Vector3(w2, 0, 0 ),
+					new THREE.Vector3(0, -h2, 0)
+				);
+
+				geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
+				geometry.faces.push( new THREE.Face3( 3, 2, 1 ) );
+				
+				var uvs = [];
+				uvs.push( new THREE.Vector2( 0.5, 0.0 ) );
+				uvs.push( new THREE.Vector2( 0.0, Math.sqrt(.75) ) );
+				uvs.push( new THREE.Vector2( 1.0, Math.sqrt(.75) ) );
+
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[1], uvs[2] ] );
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[2], uvs[1] ] );
+				var mat = new THREE.MeshBasicMaterial( { map: rtTexture, side: THREE.DoubleSide,transparent:true, depthWrite:false, depthTest: false} );
+
+				var triangle = new THREE.Mesh( geometry, mat);
+				triangle.position.set(0,0,100);
+
+				var geom2 = geometry.clone();
+				geom2.faceVertexUvs[0][0] = [ uvs[2], uvs[1], uvs[0] ];
+				geom2.faceVertexUvs[0][1] = [ uvs[2], uvs[0], uvs[1] ]; 
+				var tri2 = new THREE.Mesh( geom2, mat);
+				tri2.position.set(w2,h2,100);
+				tri2.rotation.set(0,0,-Math.PI);
+
+				var geom3 = geometry.clone();
+				geom3.faceVertexUvs[0][0] = [ uvs[1], uvs[2], uvs[0] ];
+				geom3.faceVertexUvs[0][1] = [ uvs[1], uvs[0], uvs[2] ]; 
+				var tri3 = new THREE.Mesh( geom3, mat);
+				tri3.position.set(2*w2,2*h2,100);
+
+				var primitives = [triangle, tri2, tri3];
+				strips = [];
+
+				for(var j = 0; j < 40; j++){
+					strips[j] = [];
+					for(var i = 0; i < 16; i++) {
+						for(var n = 0; n < 3; n++) {
+							var p = primitives[n].clone();
+							p.position.add(new THREE.Vector3((3*(i-4)  )*w2, (3*(i-1) - 2*(j-10))*h2, 0));
+							sceneScreen.add(p);
+							strips[j][i*3 + n] = p;
+						}
+					}
+				}
+			}
+
+			function translateStrip(strip, amt) {
+				for(var i = 0; i < strip.length; i++) {
+					strip[i].position.add(new THREE.Vector3(amt*w2,amt*h2,0));
+				}
+			}
+
+			function scaleObDist(ob, scale) {
+            	var dir = new THREE.Vector3().subVectors(ob.p1,ob.p2).normalize();
+            	dir.multiplyScalar(scale * ob.baseDist);
+            	ob.p1 = ob.basePos.clone().add(dir);
+            	ob.p2 = ob.basePos.clone().sub(dir);
+			}
+
+			function animate() {
+				zoom(zoomSpeed);
+
+				requestAnimationFrame( animate );
+
+				updateCamera();
+				updateBackground();
+				
+				for(var i = 0; i < activeScenes.length; i++)
+					activeScenes[i].update();
+
+				render();
+
+			}
+
+			function zoom(amt){
+				if((camSize > 1700 && amt > 0) || (camSize < -1700 && amt < 0))
+					return;
+				camSize += amt;
+				camera.left = camSize / -2;
+				camera.right = camSize / 2;
+				camera.top = camSize / (2*aspect);
+				camera.bottom = camSize / (-2*aspect);
+				camera.updateProjectionMatrix();
+			}
+
+			function updateSceneObjects(scene) {
+				for(var i = 0; i < scene.children.length; i++) {
+					var ob = scene.children[i];
+					if(ob.speed)
+						updateObPos(ob);
+					if(ob.rotSpeed)
+						updateObRot(ob);
+				}
+			}
+
+			function updateObPos(ob) {
+				var dir = ob.p2.clone().sub(ob.p1);
+				dir.normalize();
+
+				if(ob.transPos){
+					ob.position.add(dir.multiplyScalar(ob.speed));
+				}
+				else {
+					ob.position.add(dir.negate().multiplyScalar(ob.speed));
+				}
+
+				var dest = ob.transPos ? ob.p2 : ob.p1;
+				if(dir.dot(dest.clone().sub(ob.position)) < 0)
+					ob.transPos = !ob.transPos;
+			}
+
+			function updateObRot(ob) {
+				ob.rotateOnAxis(ob.rotAxis, ob.rotSpeed);
+			}
+
+			var oTime = Date.now();
+			var tpassed;
+			function updateTet() {
+				var time = Date.now() * 0.0015;
+				tpassed = Date.now() - oTime;
+
+				if(tpassed>800){
+					tpassed=0;
+					oTime=Date.now();
+				}
+
+				//tet1.rotation.y = - time;
+
+				//updateObPos(tet1);
+				updateSceneObjects(sceneTet);
+				
+				//tet2.rotation.y = - time + Math.PI / 2;
+
+			}
+
+			function updateShaded() {
+				updateSceneObjects(sceneShaded);
+			}
+
+			function updateIcos() {
+				icos.rotateOnAxis(new THREE.Vector3(.2,.4,.6).normalize(), .01);
+				icos.scale.set(icos.scale.x,icos.scale.y,icos.scale.z);
+				//icos.scale.x+=.004;
+				//icos.scale.y+=.005;
+				//icos.scale.z+=.002;
+				updateTet();
+			}
+
+			var updateCount = 0;
+			function updateBackground() {
+				var mat = background.children[0].material;
+				mat.uniforms['time'].value += .001;
+				if(updateCount++ == 10) {
+					mat.uniforms['cutoff1'].value = (20*Math.random()+40)/255.0;
+					mat.uniforms['cutoff2'].value = (20*Math.random()+100)/255.0;
+					updateCount = 0;
+				}
+
+			}
+
+			function updateStrips() {
+				var trans = 1;
+				var forward = true;
+				if(forward) {
+					trans = .005;
+				} else {
+					trans = -.005;
+				}
+				/*for(var i = 0; i < strips.length; i++) {
+					if(i%2 == 0) {
+						translateStrip(strips[i], trans);
+					} else {
+						translateStrip(strips[i], -trans);
+					}
+				}*/
+			}
+
+			function updateCamera() {
+				//cameraRTT.rotateOnAxis(new THREE.Vector3(0,0,1),.004);
+				camera.rotateOnAxis(new THREE.Vector3(0,0,1),rotateSpeed);
+				//camera2.rotateOnAxis(new THREE.Vector3(0,0,1),.004);
+
+			}
+
+			function render() {
+				//var s = "rgb("+256*sceneTet.clearColor.r+","+256*sceneTet.clearColor.g+","+256*sceneTet.clearColor.b+")";
+				var s = "rgb(256,256,256)";
+				renderer.setClearColor(s,0);
+
+				//renderer.clear(rtTexture, true, true, true);
+
+				//renderer.setClearColor(0x000000, 0);
+				updateColorScheme(sceneShaded,scheme);
+				// Render first scene into texture
+				//sceneTet.update();
+				//sceneIcos.update();
+				sceneTorus.update();
+
+				if(sceneFade != 0 && currentQuad == 0) {
+					sceneQuad.children[0].material.opacity = sceneFade;
+					sceneFade -= .01;
+				} else if(sceneFade != 0 && currentQuad == 1) {
+					sceneQuad2.children[0].material.opacity = sceneFade;
+					sceneFade -= .01;
+				}
+
+				if(sceneFade != 0) {
+					renderer.render(sceneTorus, cameraRTT, rtTexture, true);
+					//renderer.render(sceneTet, cameraRTT, rtTexture, false);
+				}
+				else if(currentQuad == 0) 
+					renderer.render(sceneShaded, cameraRTT, rtTexture, true);
+				else
+					renderer.render(sceneTet, cameraRTT, rtTexture, true);
+
+				renderer.render(sceneScreen, camera, quadTex, true);
+
+				comp.render();
+
+				renderer.render(background, cameraRTT, null, false);
+
+			}
+
+	    var socket = io.connect('http://localhost:8080');
+            socket.on('rotate', function(message) {
+                rotateSpeed = message / 864  * .02 - .01;
+            });
+            socket.on('zoom', function(message) {
+                zoomSpeed = message / 700  * 10.0 - 5;
+
+
+            });
+            socket.on('opacity', function(message) {
+                //quadMat.opacity= message/1024;
+            });
+            socket.on('opacityMaterial', function(message) {
+                //console.log(message);
+            });
+            socket.on('ob1Dist', function(message) {
+            	scaleObDist(sceneTet.children[0], message / 1024);
+            });
+            //socket.on('ob1')
+
+
+            //little panel
+            socket.on('hue', function(message) {
+                //console.log(message);
+                scheme.hue= message / 1024 * 350;
+            });
+
+            var schemePressed = false;
+            socket.on('scheme', function(message) {
+            	if(message > 500 && !schemePressed) {
+            		schemePressed = true;
+	                currentScheme = (currentScheme+1) % schemes.length;
+	                scheme.sc = schemes[currentScheme];
+            	} else {
+            		schemePressed = false;
+            	}
+            		
+            });
+
+            var varPressed = false;
+            socket.on('variation', function(message) {
+            	if(message > 500 && !varPressed) {
+            		varPressed = true;
+	                currentVariation = (currentVariation+1) % variations.length;
+            		scheme.variation = schemes[currentVariation];
+            	} else {
+            		varPressed = false;
+            	}
+            });
+
+            socket.on('shader1On', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+            socket.on('shader1ArgSelect', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+            socket.on('shader1Arg', function(message) {
+            	
+            });
+            socket.on('shader2On', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+            socket.on('shader2ArgSelect', function(message) {
+            	if(message > 500) {
+            		
+            	} else {
+
+            	}
+            });
+            socket.on('shader2Arg', function(message) {
+            	
+            });
+		</script>
+	</body>
+</html>

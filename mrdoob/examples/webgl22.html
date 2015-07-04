@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - render-to-texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #ffffff;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 5px;
+			}
+
+			a {
+				color: #ffffff;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		<p id="errorMessage"></p>
+
+<video id="monitor" autoplay="" width="160" height="120" style="visibility: hidden; float:left;"></video>
+<canvas id="videoImage" width="160" height="120" style="visibility: hidden; float:left;"></canvas>
+		
+		<script src="js/node_modules/color-scheme/lib/color-scheme.min.js"></script>
+		<script src="../build/three.min.js"></script>
+		<script src="js/shaders/CopyShader.js"></script>
+		<script src="js/shaders/DotScreenShader.js"></script>
+		<script src="js/shaders/RGBShiftShader.js"></script>
+		<script src="js/shaders/GrainShader.js"></script>
+		<script src="js/shaders/LensShader.js"></script>
+		<script src="js/shaders/PixelateShader.js"></script>
+		<script src="js/shaders/EdgeShader.js"></script>
+
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="omggif.js"></script>
+		<script src="js/postprocessing/EffectComposer.js"></script>
+		<script src="js/postprocessing/RenderPass.js"></script>
+		<script src="js/postprocessing/MaskPass.js"></script>
+		<script src="js/postprocessing/ShaderPass.js"></script>
+
+		<script src="js/Detector.js"></script>
+
+		<script id="fragment_shader_screen" type="x-shader/x-fragment">
+
+			varying vec2 vUv;
+			uniform float cutoff1;
+			uniform float cutoff2;
+			uniform float time;
+			uniform vec4 baseColor;
+			uniform vec4 color1;
+			uniform vec4 color2;
+
+			uniform sampler2D texMap;
+
+			void main() {
+				vec2 uv = vec2(vUv.x, vUv.y);
+				uv.y +=time;
+				uv.y -= floor(uv.y);
+				vec4 texColor = texture2D( texMap, uv);
+				if(texColor.r <= cutoff1){
+					if((cutoff1-texColor.r)<(cutoff2-cutoff1)/2.0)
+						gl_FragColor = color2;
+					else
+						gl_FragColor = vec4(color2.x*.7,color2.y*.7,color2.z*.7,1);
+				}
+				else if(texColor.r <= cutoff2)
+					if((cutoff2-texColor.r)<(1.0-cutoff2)/2.0)
+						gl_FragColor = color1;
+					else
+						gl_FragColor = vec4(color1.x*.7,color1.y*.7,color2.z*.7,1);
+				else
+					gl_FragColor = baseColor;
+			}
+
+		</script>
+
+		<script id="vertexShader" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+		<script>
+	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+	window.URL = window.URL || window.webkitURL;
+
+	var camvideo = document.getElementById('monitor');
+
+		if (!navigator.getUserMedia) 
+		{
+			document.getElementById('errorMessage').innerHTML = 
+				'Sorry. <code>navigator.getUserMedia()</code> is not available.';
+		} else {
+			navigator.getUserMedia({video: true}, gotStream, noStream);
+		}
+
+	function gotStream(stream) 
+	{
+		if (window.URL) 
+		{   camvideo.src = window.URL.createObjectURL(stream);   } 
+		else // Opera
+		{   camvideo.src = stream;   }
+
+		camvideo.onerror = function(e) 
+		{   stream.stop();   };
+
+	stream.onended = noStream;
+	}
+
+	function noStream(e) 
+	{
+		var msg = 'No camera available.';
+		if (e.code == 1) 
+		{   msg = 'User denied access to use camera.';   }
+		document.getElementById('errorMessage').textContent = msg;
+	}
+		</script>
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+			var video, videoImage, videoImageContext, videoTexture;
+			var cameraRTT, camera, camera2, renderer;
+			var sceneTet, sceneTorus, sceneTorus2, sceneIcos, sceneShaded;
+			var scenes = [];
+			var currentScene=0;
+			var sceneScreen, sceneQuad, sceneQuad2, sceneShaderQuad;
+			var currentQuad = 0;
+			var sceneFade = 0;
+			var lerps=[];
+			var activeScenes = [];
+			var tet1, tet2, torus, icos;
+			var comp;
+
+			var strips;
+			var h2, w2;
+			var textures=[];
+			var aspect = 1;
+			var shaderMaterial;
+
+			var background, foreground;
+			var backgroundTexs = [];
+			var backgroundInd=0;
+			var foregroundTexs= [];
+			var foregroundInd = 0;
+
+			var rgbTexture;
+			var finalTex;
+			var rtTexture, quadTex, quadTex2, shaderTex;
+			var rgbshifttex, tex2, backgroundTex, foregroundTex;
+			var uniformsMaterialColor= ["baseColor","color1","color2"];
+
+			var effect,effect2,effect3,effect4;
+			var effects = [];
+			var activeEffects = [];
+
+			var numTextures = 6;
+			var numTexLoaded = 0;
+
+			//inputs
+			var animSpeed = 0;
+			var rotateSpeed = 0;
+			var goalRotateSpeed=0;
+			var obRotSpeed=.02;
+			var obRotAxisScale = 1;
+			var obSpeed = 0;
+
+			lerps[0]= {};
+			lerps[0].current=rotateSpeed;
+			lerps[0].goal=rotateSpeed;
+			lerps[0].counter=0;
+			lerps[0].counterMax=1000;
+			var camSize = 800;
+			var desiredCamSize= 600;
+			lerps[1]={};
+			lerps[1].current=camSize;
+			lerps[1].goal=camSize;
+
+			lerps[1].counter=0;
+			lerps[1].counterMax=500;
+			var zoomSpeed = 0;
+			var baseHue = 0;
+
+			var hue;
+			var goalHue;
+			lerps[2]={};
+			lerps[2].counter=0;
+			lerps[2].counterMax=1000;
+
+			lerps[3]={};
+			lerps[3].current = 0;
+			lerps[3].goal=0;
+			lerps[3].counter=0;
+			lerps[3].counterMax=1000
+
+			lerps[4]={};
+			lerps[4].current = .5;
+			lerps[4].goal=1.3;
+			lerps[4].counter=0;
+			lerps[4].counterMax=1000;
+
+			lerps[5]={};
+			lerps[5].current=1;
+			lerps[5].goal=1;
+			lerps[5].counter=0;
+			lerps[5].counterMax=500;
+
+			lerps[6]={};
+			lerps[6].current=1;
+			lerps[6].goal=1;
+			lerps[6].counter=0;
+			lerps[6].counterMax=500;
+			var schemes = ['triade','tetrade','analogic'];
+			var variations = ['pastel','soft','light','hard','pale'];
+			var currentScheme = 2;
+			var currentVariation = 2;
+
+			init();
+			//animate();
+
+			function init() {
+
+				cameraRTT = new THREE.OrthographicCamera( window.innerHeight / - 2, window.innerHeight / 2, 
+					window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+
+				camera = new THREE.OrthographicCamera( camSize / -2, camSize / 2, camSize / (2), 
+					camSize / (-2), -10000, 10000 );
+				camera2 = camera.clone();
+				cameraRTT = camera.clone();
+
+				sceneTet = new THREE.Scene();
+				sceneTet.update = updateTet;
+
+				sceneTorus = new THREE.Scene();
+				sceneTorus.update = updateTorus;
+				scenes[0] = sceneTorus;
+
+				sceneTorus2 = new THREE.Scene();
+				sceneTorus2.update = updateTorus2;
+				scenes[1] = sceneTorus2;
+
+				sceneIcos = new THREE.Scene();
+				sceneIcos.update = updateIcos;
+
+				sceneShaded = new THREE.Scene();
+				sceneShaded.update = updateShaded;
+				scenes[2] = sceneShaded;
+
+				sceneScreen = new THREE.Scene();
+				sceneQuad = new THREE.Scene();
+				sceneQuad2 = new THREE.Scene();
+				sceneShaderQuad = new THREE.Scene();
+
+				activeScenes[0] = sceneShaded;
+
+				hue = Math.random() * 360;
+				lerps[2].current= hue;
+				lerps[2].goal=Math.random() * 360;
+				initTextures();
+
+				initTorusScene2();
+				initTorusScene();
+				initIcosScene();
+				loadTextures();
+
+				initKaleidescopeScene();
+
+				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
+				var mat = new THREE.MeshBasicMaterial({map:quadTex,transparent:true, depthWrite:false, depthTest: false});
+				var quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				sceneQuad.add(quadOb);
+
+				mat = new THREE.MeshBasicMaterial({map:quadTex2,transparent:true, depthWrite:false, depthTest: false});
+				quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				sceneQuad2.add(quadOb);
+
+				mat = new THREE.MeshBasicMaterial({map:shaderTex,transparent:true, depthWrite:false, depthTest: false});
+				quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				sceneShaderQuad.add(quadOb);
+
+				renderer = new THREE.WebGLRenderer({ alpha: true });
+				renderer.setSize( window.innerHeight, window.innerHeight );
+				renderer.autoClear = false;
+
+				comp = new THREE.EffectComposer( renderer );
+
+				effect2 = new THREE.ShaderPass( THREE.RGBShiftShader );
+				effect2.uniforms[ 'amount' ].value = 0.005;
+				effects[0] = effect2;
+				activeEffects[0] = true;
+
+				effect = new THREE.ShaderPass( THREE.LensShader );
+				effect.uniforms[ 'scale' ].value = .65;
+				effects[1] = effect;
+				activeEffects[1] = true;
+
+				effect3 = new THREE.ShaderPass( THREE.GrainShader );
+				effect3.uniforms[ 'textureWidth' ].value =  window.innerHeight;
+				effect3.uniforms[ 'textureHeight' ].value =  window.innerHeight;
+				effects[2] = effect3;
+				activeEffects[2] = true;
+
+				effect4 = new THREE.ShaderPass( THREE.PixelateShader );
+				effect4.uniforms[ 'width' ].value =  window.innerHeight;
+				effect4.uniforms[ 'height' ].value =  window.innerHeight;
+				effect4.uniforms['pixel_size'].value = 1;
+				effects[3] = effect4;
+				activeEffects[3] = true;
+
+
+
+				var container = document.getElementById( 'container' );
+				container.appendChild( renderer.domElement );
+
+
+			}
+			addEventListener("click", function() {
+    var
+      el = document.documentElement
+    , rfs =
+           el.requestFullScreen
+        || el.webkitRequestFullScreen
+        || el.mozRequestFullScreen
+    ;
+    rfs.call(el);
+});
+			document.getElementById('container').onkeypress = function(event) {
+			}
+
+			function randScale() {
+				return (.3+.7*Math.random())*2 -1;
+			}
+
+			function rollScales(scene) {
+				for(var i = 0; i < scene.children.length; i++) {
+					if(scene.children[i].rotSpeed)
+						scene.children[i].rotScale = randScale();
+					if(scene.children[i].speed)
+						scene.children[i].speedScale = 1;
+				}
+			}
+
+			function initTextures() {
+				rtTexture = new THREE.WebGLRenderTarget( window.innerHeight, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat } );
+				quadTex = rtTexture.clone();
+				quadTex2 = rtTexture.clone();
+				shaderTex = rtTexture.clone();
+				finalTex= rtTexture.clone();
+
+			}
+
+
+			function loadTextures() {
+
+
+				rgbshifttex = THREE.ImageUtils.loadTexture( 'textures/stripes.jpg', {}, texLoadCallback);
+				rgbshifttex.wrapS = rgbshifttex.wrapT = THREE.MirroredRepeatWrapping;
+				rgbshifttex.anisotropy = 16;
+				textures[0] = rgbshifttex;
+
+				tex2 = THREE.ImageUtils.loadTexture( 'textures/stripes.jpg', {}, texLoadCallback);
+				tex2.wrapS = tex2.wrapT = THREE.RepeatWrapping;
+				tex2.anisotropy = 16;
+				textures[1] = tex2;
+
+				var tex3 = THREE.ImageUtils.loadTexture( 'textures/bowling.jpg', {}, texLoadCallback);
+				tex3.wrapS = tex3.wrapT = THREE.RepeatWrapping;
+				tex3.anisotropy = 16;
+				textures[2] = tex3;
+
+				var tex4 = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
+				tex4.wrapS = tex4.wrapT = THREE.RepeatWrapping;
+				tex4.anisotropy = 16;
+				textures[3] = tex4;
+
+				var tex5 = THREE.ImageUtils.loadTexture( 'textures/stripeSimple.png', {}, texLoadCallback);
+				tex5.wrapS = tex5.wrapT = THREE.RepeatWrapping;
+				tex5.anisotropy = 16;
+				textures[4] = tex5;
+
+				var tex6 = THREE.ImageUtils.loadTexture( 'textures/8=D.jpg', {}, texLoadCallback);
+				tex6.wrapS = tex6.wrapT = THREE.RepeatWrapping;
+				tex6.anisotropy = 16;
+				textures[5] = tex6;
+
+				tex5 = THREE.ImageUtils.loadTexture( 'textures/zigzag.jpg', {}, texLoadCallback);
+				tex5.wrapS = tex5.wrapT = THREE.RepeatWrapping;
+				tex5.anisotropy = 16;
+				textures[6] = tex5;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/white.png', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTexs[0]= backgroundTex;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/clouds.jpg', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTex.animated = true;
+				backgroundTexs[1]= backgroundTex;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/bowling.jpg', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTex.animated = false;
+				backgroundTexs[2]= backgroundTex;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/palm.jpg', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTex.animated = true;
+				backgroundTexs[3]= backgroundTex;
+
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTex.animated = false;
+				backgroundTexs[4]= backgroundTex;
+				backgroundInd=0;
+
+				video = document.getElementById( 'monitor' );
+	
+				videoImage = document.getElementById( 'videoImage' );
+				videoImageContext = videoImage.getContext( '2d' );
+				// background color if no video present
+				videoImageContext.fillStyle = '#000000';
+				videoImageContext.fillRect( 0, 0, videoImage.width, videoImage.height );
+
+				videoTexture = new THREE.Texture( videoImage );
+				videoTexture.minFilter = THREE.LinearFilter;
+				videoTexture.magFilter = THREE.LinearFilter;
+				backgroundTex=videoTexture;
+				backgroundTex.wrapS = backgroundTex.wrapT = THREE.RepeatWrapping;
+				backgroundTex.anisotropy = 16;
+				backgroundTex.animated = true;
+				backgroundTexs[5]= backgroundTex;
+				backgroundInd=5;
+
+				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/star.jpg', {}, texLoadCallback);
+				foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
+				foregroundTex.anisotropy = 16;
+				foregroundTex.isMask = true;
+				foregroundTexs[0] = foregroundTex;
+
+				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/triangle.jpg', {}, texLoadCallback);
+				foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
+				foregroundTex.anisotropy = 16;
+				foregroundTex.isMask = true;
+				foregroundTexs[0] = foregroundTex;
+
+
+				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/star.jpg', {}, texLoadCallback);
+				foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
+				foregroundTex.anisotropy = 16;
+				foregroundTex.isMask = true;
+				foregroundTexs[2] = foregroundTex;
+
+
+				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/octagon.jpg', {}, texLoadCallback);
+				foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
+				foregroundTex.anisotropy = 16;
+				foregroundTex.isMask = true;
+				foregroundTexs[2] = foregroundTex;
+
+				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/circle.png', {}, texLoadCallback);
+				foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
+				foregroundTex.anisotropy = 16;
+				foregroundTex.isMask = true;
+				foregroundTexs[1] = foregroundTex;
+				foregroundInd=1;
+			}
+
+			function texLoadCallback() {
+				if(++numTexLoaded == textures.length+foregroundTexs.length +backgroundTexs.length) {
+					initShadedScene();
+					initTetScene();
+					initBackground();
+					animate();
+				}
+			}
+
+			function initBackground() {
+				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
+				var mat = new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1.0,
+					uniforms: { texMap: { type: "t", value: backgroundTex}, baseColor: { type: "v4", value : new THREE.Vector4(0, 0,0,0) }, 
+						color1: { type: "v4", value : new THREE.Vector4(1,.69,.4,0) }, color2: { type: "v4", value : new THREE.Vector4(1,.69,.4,0) }, 
+						cutoff1: { type:"1f", value: 0}, cutoff2: { type:"1f", value: .5}, time: { type:"1f", value: 0} },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+				var quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				quadOb.textured = true;
+
+				background = new THREE.Scene();
+				background.add(quadOb);
+				background.on = false;
+				background.background = true;
+				initColorScheme(background, scheme);
+
+				mat = new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : .4,
+					uniforms: { texMap: { type: "t", value: foregroundTex}, baseColor: { type: "v4", value : new THREE.Vector4(0, 0,0,1) }, 
+						color1: { type: "v4", value : new THREE.Vector4(1,.69,.4,0) }, color2: { type: "v4", value : new THREE.Vector4(1,.69,.4,0) }, 
+						cutoff1: { type:"1f", value: .3}, cutoff2: { type:"1f", value: .6}, time: { type:"1f", value: 0} },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+				} );
+
+				quadOb = new THREE.Mesh(quad, mat);
+				quadOb.position.set(0,0,100);
+				quadOb.textured = true;
+
+				foreground = new THREE.Scene();
+				foreground.add(quadOb);
+				foreground.on = false;
+				foreground.foreground = true;
+				initColorScheme(foreground, scheme);
+
+			}
+
+			function genTexturedMat(texture, baseColor, color1, color2) {
+				return new THREE.ShaderMaterial( {
+					transparent: true,
+					alphaTest: 0.0,
+					opacity     : 1.0,
+					uniforms: { texMap: { type: "t", value: texture}, baseColor: { type: "v4", value : baseColor }, 
+						color1: { type: "v4", value : color1 }, color2: { type: "v4", value : color2 }, cutoff1: { type:"1f", value: .05}, cutoff2: { type:"1f", value: .9}, time: { type:"1f", value: 0} },
+					vertexShader: document.getElementById( 'vertexShader' ).textContent,
+					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
+
+				} );
+			}
+
+			function setupMoveOb(ob) {
+				ob.baseDist = new THREE.Vector3().subVectors(ob.p1,ob.p2).length();
+				ob.basePos = new THREE.Vector3().addVectors(ob.p1,ob.p2).divideScalar(2);
+				ob.transPos = true;
+			}	
+
+			var scheme;
+			function initTetScene() {
+
+				var geometry = new THREE.TetrahedronGeometry( 100,1 );
+
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xEFD4FF,shading: THREE.FlatShading} );
+				var mat2 = new THREE.MeshBasicMaterial( { color: 0xD4FFEF,shading: THREE.FlatShading} );
+
+				mat1 = genTexturedMat(textures[2], new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1), new THREE.Vector4(0,0,0,1));
+
+				tet1 = new THREE.Mesh( geometry, mat1 );
+				tet1.textured = true;
+				tet1.position.set( 100, 0, 100 );
+				tet1.scale.set( 2.4, 2.4, 2.4 );
+
+				tet1.p1 = tet1.position.clone();
+				tet1.p2 = (new THREE.Vector3(-25,0,-100)).add(tet1.position);
+				tet1.speed = .5;
+				setupMoveOb(tet1);
+
+				tet1.rotAxis = new THREE.Vector3(1,2,0).normalize();
+				tet1.rotSpeed = .01;
+
+				sceneTet.add( tet1 );
+
+				//scaleObDist(tet1, 4);
+
+				tet2 = new THREE.Mesh( geometry, mat2 );
+				tet2.position.set( 300, 300, 100 );
+				tet2.scale.set( 2.7, 2.7, 2.7 );
+
+				tet2.p1 = tet2.position.clone();
+				tet2.p2 = (new THREE.Vector3(100,25,50)).add(tet1.position);
+				tet2.speed = .02;
+				setupMoveOb(tet2);
+
+				tet2.rotAxis = new THREE.Vector3(0,1,0);
+				tet2.rotSpeed = -.02;
+
+				sceneTet.add( tet2 );
+
+				var light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 0, 0, 1 ).normalize();
+				//sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				//``sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, 1, 0 ).normalize();
+				//sceneTet.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+				light.position.set( 0, -1, 0 ).normalize();
+				//sceneTet.add( light );
+
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneTet,scheme);
+
+			}
+
+			function initTorusScene() {
+				var geometry = new THREE.TorusGeometry(110,20,32,32);
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+
+				torus = new THREE.Mesh(geometry, mat1);
+				//torus.textured=true;
+				torus.position.set(100,50,100);
+				torus.scale.set(2.2,2.2,2.2);
+				torus.baseScale = 2.2;
+				torus.rotSpeed = .014;
+
+				torus.rotAxis = new THREE.Vector3(.2,1,0).normalize();
+
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+				setupMoveOb(torus);
+
+				sceneTorus.add( torus );
+
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(100,50,100);
+				//torus.textured=true;
+				torus.scale.set(2.2,2.2,2.2);
+				torus.baseScale = 2.2
+				torus.rotSpeed = .02;
+				torus.rotAxis = new THREE.Vector3(1,.2,0).normalize();
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+				setupMoveOb(torus);
+
+			    sceneTorus.add(torus);
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var sphere = new THREE.Mesh( geometry, material );
+				//sphere.textured=true;
+				sphere.position.set(100,50,100);
+				sphere.scale.set(2.2,2.2,2.2);
+				sphere.baseScale = 2.2;
+				sphere.rotSpeed =0;
+				sphere.p1= new THREE.Vector3(300,20,100);
+				sphere.p2= new THREE.Vector3(-300,-20,100);
+				sphere.speed=1;
+				setupMoveOb(sphere);
+
+				sceneTorus.add( sphere );
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(500,50,100);
+				//torus.textured=true;
+				torus.scale.set(2.2,2.2,2.2);
+				torus.baseScale = 2.2;
+				torus.rotSpeed = .03;
+				torus.rotAxis = new THREE.Vector3(.5,.5,0).normalize();
+				torus.p1= new THREE.Vector3(1000,50,100);
+				torus.p2= new THREE.Vector3(-1000,-50,100);
+				torus.speed=2;
+			    sceneTorus.add(torus);
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+				var sphere = new THREE.Mesh( geometry, material );
+				sphere.position.set(500,50,100);
+				sphere.scale.set(2.2,2.2,2.2);
+				sphere.baseScale = 2.2;
+				//sphere.textured=true;
+				sphere.rotSpeed =0;
+				sphere.p1= new THREE.Vector3(1000,50,100);
+				sphere.p2= new THREE.Vector3(-1000,-50,100);
+				sphere.speed=1.4;
+				sceneTorus.add( sphere );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneTorus,scheme);
+
+        		rollScales(sceneTorus);
+
+        		//updateTextures(sceneTorus);
+			}
+
+			function initTorusScene2(){
+				var geometry = new THREE.TorusKnotGeometry(200,50,64,64);
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+				//mat1 = genTexturedMat(textures[0], new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+
+				torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(100,50,100);
+				torus.rotSpeed = .05;
+
+				torus.rotAxis = new THREE.Vector3(.2,1,0).normalize();
+
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+				setupMoveOb(torus);
+				sceneTorus2.add( torus );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				var geometry = new THREE.TorusKnotGeometry(400,60,64,64,3,3);
+				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
+
+				torus = new THREE.Mesh(geometry, mat1);
+				torus.position.set(100,50,100);
+				torus.rotSpeed = .015;
+
+				torus.rotAxis = new THREE.Vector3(.2,1,0).normalize();
+
+				torus.p1= new THREE.Vector3(300,20,100);
+				torus.p2= new THREE.Vector3(-300,-20,100);
+				torus.speed=1;
+				setupMoveOb(torus);
+				sceneTorus2.add( torus );
+				var geometry = new THREE.SphereGeometry( 100, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				var sphere = new THREE.Mesh( geometry, material );
+				sphere.position.set(100,50,100);
+				sphere.rotSpeed =0;
+				sphere.p1= new THREE.Vector3(300,20,100);
+				sphere.p2= new THREE.Vector3(-300,-20,100);
+				sphere.speed=1;
+				setupMoveOb(sphere);
+
+				sceneTorus2.add( sphere );
+
+				var geometry = new THREE.SphereGeometry( 40, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
+				var sphere = new THREE.Mesh( geometry, material );
+				//sphere.textured=true;
+				sphere.position.set(100,50,100);
+				sphere.rotSpeed =0;
+				//sphere.textured=true;
+				sphere.p1= new THREE.Vector3(300,20,100);
+				sphere.p2= new THREE.Vector3(-300,-20,100);
+				sphere.speed=1;
+				setupMoveOb(sphere);
+
+				sceneTorus2.add( sphere )
+
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneTorus2,scheme);
+        		rollScales(sceneTorus2);
+
+			}
+
+			function updateTorus() {
+				updateSceneObjects(sceneTorus);
+			}
+			function updateTorus2() {
+				updateSceneObjects(sceneTorus2);
+			}
+			function initIcosScene() {
+				var geom = new THREE.IcosahedronGeometry(200);
+				var mat = new THREE.MeshLambertMaterial({color:0xFFFFFF, shading: THREE.FlatShading});
+				icos = new THREE.Mesh(geom, mat);
+				icos.position.set(100,100,100);
+			
+				sceneIcos.add(icos);
+
+				var light = new THREE.DirectionalLight( 0xFFFFFF, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				sceneIcos.add( light );
+
+				light = new THREE.AmbientLight( 0x999999);
+				//sceneIcos.add( light );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneIcos,scheme);
+			}
+			function changeMap(mat,url){
+				rgbshifttex = THREE.ImageUtils.loadTexture( 'url', {}, texLoadCallback);
+				rgbshifttex.wrapS = rgbshifttex.wrapT = THREE.RepeatWrapping;
+				rgbshifttex.anisotropy = 16;
+
+			}
+			function initShadedScene() {
+				var mat = new THREE.MeshPhongMaterial( { alphaTest: 0.5, ambient: 0xffffff, color: 0xffffff, specular: 0x030303, emissive: 0x111111, shiness: 10, map: rgbshifttex, side: THREE.DoubleSide} );
+				mat = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
+
+				var geom = new THREE.IcosahedronGeometry(400);
+
+				var icos = new THREE.Mesh(geom, mat);
+				icos.position.set(100,100,100);
+				icos.speed = 1;
+				icos.p1 = new THREE.Vector3(100,100,450);
+				icos.p2 = new THREE.Vector3(100,100,270);
+				setupMoveOb(icos);
+
+				icos.rotSpeed = .02;
+				icos.rotAxis = new THREE.Vector3(0,1,.5).normalize();
+				icos.textured =true;
+				sceneShaded.add(icos);
+
+				var mat2 = new THREE.MeshPhongMaterial( { alphaTest: 0.5, ambient: 0xffffff, color: 0xffffff, specular: 0x030303, emissive: 0x111111, shiness: 10, map: tex2, side: THREE.DoubleSide} );
+				mat2 = genTexturedMat(tex2, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(1,1,.7,1), new THREE.Vector4(1,.7,1,1));
+
+				var geom2 = new THREE.BoxGeometry(325, 325, 325);
+
+				var cube = new THREE.Mesh(geom2, mat2);
+				cube.position.set(100,100,500);
+				cube.speed = 0;
+				cube.rotSpeed = .01;
+				cube.rotAxis = new THREE.Vector3(1, 1, 0).normalize();
+				cube.textured=true;
+				sceneShaded.add(cube);
+
+				var light = new THREE.DirectionalLight( 0xFFFFFF, 1.5 );
+				light.position.set( 1, 0, .2 ).normalize();
+				light.speed = 0;
+				light.rotSpeed = 0;
+				//sceneShaded.add( light );
+
+				light = new THREE.AmbientLight( 0xFFFFFF);
+				light.speed = 0;
+				light.rotSpeed = 0;
+				sceneShaded.add( light );
+				scheme = new ColorScheme;
+ 				scheme.from_hue(hue) 
+ 				.scheme(schemes[currentScheme])   
+        		.variation(variations[currentVariation]);
+        		scheme.hue=hue;
+        		scheme.sc=schemes[currentScheme];
+        		scheme.variation= variations[currentVariation];
+        		initColorScheme(sceneShaded,scheme);
+        		updateTextures(sceneShaded);
+
+        		rollScales(sceneShaded);
+
+			}
+
+			function updateTextures(scene){
+				for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i].textured){
+						var t= Math.floor(Math.random()*(textures.length-1));
+						scene.children[i].material.uniforms["texMap"].value= textures[t]; 
+						scene.children[i].material.uniforms["texMap"].needsUpdate = true;
+					}
+				}
+			}
+			function updateTextureSelect(scene){
+				for(var i =0; i<scene.children.length; i++){
+
+					if(scene.children[i].textured){
+						console.log(textureSelect[i]%textures.length);
+						scene.children[i].material.uniforms["texMap"].value= textures[textureSelect.selected[i]%textures.length]; 
+						scene.children[i].material.uniforms["texMap"].needsUpdate = true;
+					}
+				}
+			}
+			function initColorScheme(scene,scheme){ 
+				var baseind=4;
+				var colorind=baseind;
+				var schemenew = new ColorScheme;
+				schemenew.from_hue(scheme.hue) 
+ 				.scheme(scheme.sc)   
+        		.variation(scheme.variation);
+        		schemenew.hue=scheme.hue;
+        		schemenew.sc=scheme.sc;
+        		schemenew.variation=scheme.variation;
+        		scheme=schemenew;
+        		var colors = scheme.colors();				
+        		for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i] instanceof THREE.Mesh){
+						if(scene.children[i].textured){
+
+							scene.children[i].colorinds=[];
+							colorind = Math.floor(Math.random()*colors.length/4)*4;
+
+							for(var j=0; j<3; j++){
+								
+								var rgb=hexToRgb(colors[colorind]);
+								colorind+=4;
+								colorind = colorind % (colors.length);
+
+								//if(rgb.r >= 0.2 && rgb.g >= 0.2 && rgb.b >= 0.2)
+								//	scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(0,0,0,0);
+								//else
+								if(scene.background)
+									scene.children[i].colorinds[j]=colorind;
+								else if(scene.foreground)
+									scene.children[i].colorinds[j]=colorind+2;
+								else
+									scene.children[i].colorinds[j]=colorind+3;
+								scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,1);
+							}
+						}
+						else{
+							colorind = Math.floor(Math.random()*colors.length/4)*4+3;
+
+							var rgb=hexToRgb(colors[colorind]);	
+							scene.children[i].colorind=colorind;
+							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
+						}	
+					}
+				}
+				scene.clearColor = hexToRgb(colors[colorind]);
+			}
+			function updateColorScheme(scene,scheme){
+				var schemenew = new ColorScheme;
+				schemenew.from_hue(lerps[2].current) 
+ 				.scheme(scheme.sc)   
+        		.variation(scheme.variation);
+        		schemenew.hue=lerps[2].current;
+        		schemenew.sc=scheme.sc;
+        		schemenew.variation=scheme.variation;
+        		scheme=schemenew;
+        		var colors = scheme.colors();
+        		for(var i =0; i<scene.children.length; i++){
+					if(scene.children[i] instanceof THREE.Mesh){
+						if(scene.children[i].textured){
+							for(var j=0; j<3; j++){
+								var colorind = scene.children[i].colorinds[j];
+								var rgb=hexToRgb(colors[colorind]);
+								scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,scene.children[i].material.uniforms[uniformsMaterialColor[j]].value.w);
+							}
+						}
+						else{
+							var colorind = scene.children[i].colorind;
+							var rgb=hexToRgb(colors[colorind]);	
+							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
+						}	
+					}
+				}
+			}
+			function hexToRgb(hex) {
+    			var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    			return result ? {
+        			r: (parseInt(result[1], 16))/256.0,
+        			g: (parseInt(result[2], 16))/256.0,
+        			b: (parseInt(result[3], 16))/256.0
+    			} : null;
+			}
+
+			function initKaleidescopeScene() {
+
+				h2 = 30*Math.sqrt(27);
+				w2 = 30*3;
+
+				var geometry = new THREE.Geometry();
+				geometry.vertices.push(
+					new THREE.Vector3(0, h2, 0),
+					new THREE.Vector3(-w2, 0, 0 ),
+					new THREE.Vector3(w2, 0, 0 ),
+					new THREE.Vector3(0, -h2, 0)
+				);
+
+				geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
+				geometry.faces.push( new THREE.Face3( 3, 2, 1 ) );
+				
+				var uvs = [];
+				uvs.push( new THREE.Vector2( 0.5, 0.0 ) );
+				uvs.push( new THREE.Vector2( 0.0, Math.sqrt(.75) ) );
+				uvs.push( new THREE.Vector2( 1.0, Math.sqrt(.75) ) );
+
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[1], uvs[2] ] );
+				geometry.faceVertexUvs[ 0 ].push( [ uvs[0], uvs[2], uvs[1] ] );
+				var mat = new THREE.MeshBasicMaterial( { map: rtTexture, side: THREE.DoubleSide,transparent:true, depthWrite:false, depthTest: false} );
+
+				var triangle = new THREE.Mesh( geometry, mat);
+				triangle.position.set(0,0,100);
+
+				var geom2 = geometry.clone();
+				geom2.faceVertexUvs[0][0] = [ uvs[2], uvs[1], uvs[0] ];
+				geom2.faceVertexUvs[0][1] = [ uvs[2], uvs[0], uvs[1] ]; 
+				var tri2 = new THREE.Mesh( geom2, mat);
+				tri2.position.set(w2,h2,100);
+				tri2.rotation.set(0,0,-Math.PI);
+
+				var geom3 = geometry.clone();
+				geom3.faceVertexUvs[0][0] = [ uvs[1], uvs[2], uvs[0] ];
+				geom3.faceVertexUvs[0][1] = [ uvs[1], uvs[0], uvs[2] ]; 
+				var tri3 = new THREE.Mesh( geom3, mat);
+				tri3.position.set(2*w2,2*h2,100);
+
+				var primitives = [triangle, tri2, tri3];
+				strips = [];
+
+				for(var j = 0; j < 40; j++){
+					strips[j] = [];
+					for(var i = 0; i < 16; i++) {
+						for(var n = 0; n < 3; n++) {
+							var p = primitives[n].clone();
+							p.position.add(new THREE.Vector3((3*(i-4)  )*w2, (3*(i-1) - 2*(j-10))*h2, 0));
+							sceneScreen.add(p);
+							strips[j][i*3 + n] = p;
+						}
+					}
+				}
+			}
+
+			function translateStrip(strip, amt) {
+				for(var i = 0; i < strip.length; i++) {
+					strip[i].position.add(new THREE.Vector3(amt*w2,amt*h2,0));
+				}
+			}
+
+			function scaleObDist(ob, scale) {
+            	var dir = new THREE.Vector3().subVectors(ob.p1,ob.p2).normalize();
+            	dir.multiplyScalar(scale * ob.baseDist);
+            	ob.p1 = ob.basePos.clone().add(dir);
+            	ob.p2 = ob.basePos.clone().sub(dir);
+			}
+			var counter=0;
+			var t=0;
+			function animate() {
+				zoom();
+				for(var i=0; i<lerps.length;i++){
+					lerps[i].counter++;
+					if(lerps[i].counter>lerps[i].counterMax){
+						lerps[i].counter=0;
+					}
+					lerps[i].current=lerp(lerps[i].current,lerps[i].goal,lerps[i].counter/lerps[i].counterMax);
+				}
+				console.log(lerps[6].current)
+				effect2.uniforms[ 'amount' ].value = lerps[3].current;
+				effect4.uniforms['pixel_size'].value = Math.floor(lerps[6].current);
+
+				t+=.0008;
+				effect3.uniforms[ 'timer' ].value = t;
+				counter++;
+				if(counter>1000)
+					counter=0;
+				requestAnimationFrame( animate );
+
+				//sceneTet.update();
+				//sceneIcos.update();
+				sceneTorus.update();
+				sceneShaded.update();
+				sceneTorus2.update()
+				updateScale();
+				updateColorScheme(sceneTorus,scheme);
+				updateColorScheme(sceneTorus2,scheme);
+				updateColorScheme(sceneShaded,scheme);
+				updateColorScheme(background, scheme);
+
+				if(!foregroundTexs[foregroundInd].isMask)
+					updateColorScheme(foreground, scheme);
+
+				updateCamera();
+
+				if(background.on && backgroundTexs[backgroundInd].animated)
+					updateBackground();
+				if(foreground.on && !foregroundTexs[foregroundInd].isMask)
+					updateForeground();
+
+				render();
+
+			}
+			var counter=0;
+			function zoom(){
+
+
+				//camSize=lerp(camSize, desiredCamSize,counter/1000);
+
+				camera.left = lerps[1].current / -2;
+				camera.right = lerps[1].current / 2;
+				camera.top = lerps[1].current / (2*aspect);
+				camera.bottom = lerps[1].current / (-2*aspect);
+				camera.updateProjectionMatrix();
+			}
+			function lerp(v1,v2,t){
+				return (v1*(1-t)+v2*t);
+			}
+			function updateSceneObjects(scene) {
+				for(var i = 0; i < scene.children.length; i++) {
+					var ob = scene.children[i];
+					if(ob.speed)
+						updateObPos(ob);
+					if(ob.rotSpeed)
+						updateObRot(ob);
+				}
+			}
+			function updateScale(){
+            	for(var i = 0; i < sceneShaded.children.length; i++) {
+            		var s = lerps[4].current;
+            		sceneShaded.children[i].scale.set(s,s,s);
+            	}
+            	for(var i = 0; i < sceneTorus2.children.length; i++) {
+            		var s = lerps[4].current;
+            		sceneTorus2.children[i].scale.set(s,s,s);
+            	}
+				for(var i = 0; i < sceneTorus.children.length; i++) {
+					var s = sceneTorus.children[i].baseScale*lerps[4].current;
+            		sceneTorus.children[i].scale.set(s,s,s);
+            	}
+
+			}
+			function updateObPos(ob) {
+				var dir = ob.p2.clone().sub(ob.p1);
+				dir.normalize();
+
+				var speed = obSpeed * ob.speedScale;
+				if(!ob.transPos)
+					speed = -speed;
+				
+				ob.position.add(dir.multiplyScalar(speed));
+				
+
+				var dest = ob.transPos ? ob.p2 : ob.p1;
+				if(dir.dot(dest.clone().sub(ob.position)) < 0)
+					ob.transPos = !ob.transPos;
+			}
+
+			function updateObRot(ob) {
+				ob.rotateOnAxis(ob.rotAxis.clone().multiplyScalar(obRotAxisScale), obRotSpeed*ob.rotScale/obRotAxisScale);
+			}
+
+			var oTime = Date.now();
+			var tpassed;
+			function updateTet() {
+				var time = Date.now() * 0.0015;
+				tpassed = Date.now() - oTime;
+
+				if(tpassed>800){
+					tpassed=0;
+					oTime=Date.now();
+				}
+
+				//tet1.rotation.y = - time;
+
+				//updateObPos(tet1);
+				updateSceneObjects(sceneTet);
+				
+				//tet2.rotation.y = - time + Math.PI / 2;
+
+			}
+
+			function updateShaded() {
+				updateSceneObjects(sceneShaded);
+			}
+
+			function updateIcos() {
+				icos.rotateOnAxis(new THREE.Vector3(.2,.4,.6).normalize(), .01);
+				icos.scale.set(icos.scale.x,icos.scale.y,icos.scale.z);
+				//icos.scale.x+=.004;
+				//icos.scale.y+=.005;
+				//icos.scale.z+=.002;
+			}
+
+			var updateCount = 0;
+			var backgroundUp = true;
+			
+			function updateBackground() {
+				var backP = animSpeed;
+				var addAmt = .5 / backP;
+				var mat = background.children[0].material;
+				var add = backgroundUp ? addAmt : -addAmt;
+				mat.uniforms['cutoff1'].value += add;
+				mat.uniforms['cutoff2'].value += add;
+
+				if(updateCount++ >= backP) {
+					backgroundUp = !backgroundUp;
+					updateCount = 0;
+				}
+			}
+
+			var updateCountF = 0;
+			var foregroundUp = true;
+			var foreP = 1000;
+			var addAmtF = .5 / foreP;
+			function updateForeground() {
+				var mat = foreground.children[0].material;
+				var add = foregroundUp ? addAmtF : -addAmtF;
+				mat.uniforms['cutoff1'].value += add;
+				mat.uniforms['cutoff2'].value += add;
+
+				if(!foregroundTexs[foregroundInd].isMask)
+					mat.uniforms['time'].value += .001;
+				else
+					mat.uniforms['time'].value = 0;
+
+				if(updateCountF++ == foreP) {
+					foregroundUp = !foregroundUp;
+					updateCountF = 0;
+				}
+			}
+
+			function updateStrips() {
+				var trans = 1;
+				var forward = true;
+				if(forward) {
+					trans = .005;
+				} else {
+					trans = -.005;
+				}
+				/*for(var i = 0; i < strips.length; i++) {
+					if(i%2 == 0) {
+						translateStrip(strips[i], trans);
+					} else {
+						translateStrip(strips[i], -trans);
+					}
+				}*/
+			}
+			var lastCamRot=0;
+			function updateCamera() {
+				camera.rotateOnAxis(new THREE.Vector3(0,0,1),lerps[0].current);
+
+				lastCamRot = lerps[5].current;
+				//cameraRTT.rotateOnAxis(new THREE.Vector3(0,0,1),.004);
+				//camera.rotateOnAxis(new THREE.Vector3(0,0,1),lerps[0].current);
+				//camera2.rotateOnAxis(new THREE.Vector3(0,0,1),.004);
+
+			}
+			var tem=0;
+			function render() {
+				//var s = "rgb("+256*sceneTet.clearColor.r+","+256*sceneTet.clearColor.g+","+256*sceneTet.clearColor.b+")";
+				var s = "rgb(256,256,256)";
+				if ( video.readyState === video.HAVE_ENOUGH_DATA ) 
+				{
+					videoImageContext.drawImage( video, 0, 0, videoImage.width, videoImage.height );
+				if ( backgroundTexs[5] ) 
+					videoTexture.needsUpdate = true;
+				}
+				//renderer.setClearColor(s,0);
+
+				//renderer.clear(rtTexture, true, true, true);
+
+				renderer.setClearColor(0xffff00, 0);
+				tem++;
+				if(tem==100)
+					generateGIF();
+				comp.passes.splice(0,comp.passes.length);
+				comp.addPass( new THREE.RenderPass( sceneShaderQuad, cameraRTT) );
+				for(var i = 0; i < effects.length; i++) {
+					if(activeEffects[i]) {
+						effects[i].renderToScreen = false;
+						comp.passes.push(effects[i]);
+					}
+				}
+
+				//if(comp.passes.length > 1)
+				comp.passes[comp.passes.length-1].renderToScreen = true;
+				
+
+				// Render first scene into texture
+
+				if(sceneFade > 0)
+					sceneFade -= .01;
+				else
+					sceneFade = 0;
+
+				/*var quad = (currentQuad == 0) ? sceneQuad : sceneQuad2;
+				var quad2 = (currentQuad == 0) ? sceneQuad2 : sceneQuad;
+
+				if(sceneFade != 0) {
+					quad2.children[0].material.opacity = sceneFade;
+					quad.children[0].material.opacity = 1-sceneFade;
+				} else {
+					quad2.children[0].material.opacity = 0;
+					quad.children[0].material.opacity = 1;
+				}
+				
+				if(sceneFade != 0 || currentQuad == 0) {
+					renderer.render(sceneShaded, cameraRTT, rtTexture, true);
+					renderer.render(sceneScreen, camera, quadTex, true);
+				}
+				if(sceneFade != 0 || currentQuad == 1) {
+					renderer.render(sceneTorus, cameraRTT, rtTexture, true);
+					renderer.render(sceneScreen, camera, quadTex2, true);
+				}*/
+
+				var scene1 = scenes[(currentScene+1)%scenes.length];
+				var scene2 = scenes[currentScene];
+
+				if(sceneFade != 0) {
+					sceneQuad2.children[0].material.opacity = lerps[5].current/1023*sceneFade;
+					sceneQuad.children[0].material.opacity = lerps[5].current/1023*(1-sceneFade);
+				} else {
+					sceneQuad2.children[0].material.opacity = 0;
+					sceneQuad.children[0].material.opacity = lerps[5].current/1023*1;
+				}
+
+				if(sceneFade != 0) {
+					renderer.render(scene1, cameraRTT, rtTexture, true);
+					renderer.render(sceneScreen, camera, quadTex, true);
+					renderer.render(scene2, cameraRTT, rtTexture, true);
+					renderer.render(sceneScreen, camera, quadTex2, true);
+				} else {
+					renderer.render(scene1, cameraRTT, rtTexture, true);
+					renderer.render(sceneScreen, camera, quadTex, true);
+				}
+
+				renderer.render(background, cameraRTT, shaderTex, true);
+
+				if(sceneFade != 0) {
+					renderer.render(sceneQuad2, cameraRTT, shaderTex, false);
+					renderer.render(sceneQuad, cameraRTT, shaderTex, false);
+				} else {
+					renderer.render(sceneQuad, cameraRTT, shaderTex, false);
+				}
+				
+				/*if(sceneFade != 0) {
+					renderer.render(sceneQuad2, cameraRTT, shaderTex, false);
+					renderer.render(sceneQuad, cameraRTT, shaderTex, false);
+				} else if(currentQuad == 0) {
+					renderer.render(sceneQuad, cameraRTT, shaderTex, false);
+				} else {
+					renderer.render(sceneQuad2, cameraRTT, shaderTex, false);
+				}*/
+
+				if(foreground.on)
+					renderer.render(foreground, cameraRTT, shaderTex, false);
+
+				comp.render();
+
+				
+
+			}
+		function generateGIF() {
+
+				generating = true;
+
+				var current = 0;
+				var total = 100;
+
+				var canvas = document.createElement( 'canvas' );
+				canvas.width = renderer.domElement.width;
+				canvas.height = renderer.domElement.height;
+
+				var context = canvas.getContext( '2d' );
+
+				var buffer = new Uint8Array( canvas.width * canvas.height * total * 5 );
+				var gif = new GifWriter( buffer, canvas.width, canvas.height, { loop: 0 } );
+
+				var pixels = new Uint8Array( canvas.width * canvas.height );
+
+				var addFrame = function () {
+
+					render();
+
+					context.drawImage( renderer.domElement, 0, 0 );
+
+					var data = context.getImageData( 0, 0, canvas.width, canvas.height ).data;
+
+					var palette = [];
+
+					for ( var j = 0, k = 0, jl = data.length; j < jl; j += 4, k ++ ) {
+
+						var r = Math.floor( data[ j + 0 ] * 0.1 ) * 10;
+						var g = Math.floor( data[ j + 1 ] * 0.1 ) * 10;
+						var b = Math.floor( data[ j + 2 ] * 0.1 ) * 10;
+						var color = r << 16 | g << 8 | b << 0;
+
+						var index = palette.indexOf( color );
+
+						if ( index === -1 ) {
+
+							pixels[ k ] = palette.length;
+							palette.push( color );
+
+						} else {
+
+							pixels[ k ] = index;
+
+						}
+
+					}
+
+					// force palette to be power of 2
+
+					var powof2 = 1;
+					while ( powof2 < palette.length ) powof2 <<= 1;
+					palette.length = powof2;
+
+					gif.addFrame( 0, 0, canvas.width, canvas.height, pixels, { palette: new Uint32Array( palette ), delay: 5 } );
+
+					current ++;
+
+					if ( current < total ) {
+
+						setTimeout( addFrame, 0 );
+
+					} else {
+
+						setTimeout( finish, 0 );
+
+					}
+
+					//progress.value = current / total;
+
+				}
+
+				var finish = function () {
+
+					// return buffer.slice( 0, gif.end() );
+
+					var string = '';
+
+					for ( var i = 0, l = gif.end(); i < l; i ++ ) {
+
+						string += String.fromCharCode( buffer[ i ] )
+
+					}
+
+					var image = document.createElement( 'img' );
+					image.src = 'data:image/gif;base64,' + btoa( string );
+					document.body.appendChild( image );
+
+					generating = false;
+					animate();
+
+				}
+				addFrame();
+		}	
+
+	    var socket = io.connect('http://localhost:8080');
+            socket.on('rotate', function(message) {
+                var newVal = (message / 1023-.5)  * .015;
+                if(Math.abs(newVal-lerps[0].goal)>.005){
+                	lerps[0].counterMax=1000;
+                	lerps[0].goal =newVal;
+                	lerps[0].counter=0;
+                }
+            });
+
+
+            socket.on('animSpeed', function(message) {
+                animSpeed = 50+400*(1-message/1024);
+            });
+
+            socket.on('zoom', function(message) {
+                var newVal =message / 1023  * 800.0 + 400;
+                 if(Math.abs(newVal-lerps[1].goal)>5){
+                	lerps[1].goal =newVal;
+                	lerps[1].counter=0;
+                }
+            });
+
+            socket.on('opacity', function(message) {
+                quadMat.opacity= message/1024;
+            });
+
+            socket.on('obDist', function(message) {
+            	for(var i = 0; i < sceneTet.children.length; i++) {
+            		if(sceneTet.children[i].speed)
+            			scaleObDist(sceneTet.children[i], message / 1023);
+            	}
+            	for(var i = 0; i < sceneTorus.children.length; i++) {
+            		if(sceneTorus.children[i].speed)
+            			scaleObDist(sceneTorus.children[i], message / 1023);
+            	}
+            });
+            socket.on('obRot', function(message) {
+            	var rotSpeed = .12 * (message / 1023 - .5);
+
+            	obRotSpeed=rotSpeed;
+
+            	//sceneTet.children[0].rotSpeed = rotSpeed;
+            	//sceneShaded.children[0].rotSpeed = rotSpeed;
+            });
+            socket.on('obScale', function(message) {
+            	var scale = (message / 1023)*(message / 1023)+.75;
+            	if(Math.abs(scale-lerps[4].goal)>.01){
+                	lerps[4].goal =scale;
+                	lerps[4].counter=0;
+                }
+
+            	//sceneTet.children[0].rotSpeed = rotSpeed;
+            	//sceneShaded.children[0].rotSpeed = rotSpeed;
+            });
+
+            socket.on('obSpeed', function(message) {
+                obSpeed = 10 * (message / 1023 - .5);
+                obSpeed = Math.abs(obSpeed);
+            });
+            socket.on('obRotAxisScale', function(message) {
+                obRotAxisScale = (message / 1023 + .5);
+            });
+            socket.on('blackButton', function(message) {
+                currentScene = (currentScene+1) % scenes.length;
+                if(sceneFade == 0) {
+                	sceneFade = 1;
+                	initColorScheme(scenes[(currentScene+1) % scenes.length], scheme);
+                	rollScales(scenes[(currentScene+1) % scenes.length]);
+
+                	if((currentScene+1) % scenes.length == 2)
+                		updateTextures(sceneShaded);
+                }
+            });
+            socket.on('lightButton1', function(message) {
+                if(message == 1){
+                	foreground.on = true;
+                	foregroundInd++;
+                	if(foregroundInd>foregroundTexs.length-1)
+                		foregroundInd=0;
+                	foreground.children[0].material.uniforms["texMap"].value= foregroundTexs[foregroundInd];
+                	foreground.children[0].material.uniforms["baseColor"].value =new THREE.Vector4(0, 0,0,0);
+                	if(!foregroundTexs[foregroundInd].isMask) {
+                		foreground.children[0].material.uniforms["color1"].value.w = .25;
+                		foreground.children[0].material.uniforms["color2"].value.w = .5;
+                	} else {
+                		foreground.children[0].material.uniforms["color1"].value.set(0,0,0,1);
+                		foreground.children[0].material.uniforms["color2"].value.set(0,0,0,1);
+                		foreground.children[0].material.uniforms["cutoff1"].value = .5;
+                		foreground.children[0].material.uniforms["cutoff2"].value = .9;
+                		foreground.children[0].material.uniforms["time"].value = 0;
+                	}
+                }
+                else{
+                	foreground.on = false;
+                }
+            });
+            socket.on('lightButton2', function(message) {
+                if(message == 1){
+                	background.on = true;
+                	backgroundInd++;
+                	if(backgroundInd>backgroundTexs.length-1)
+                		backgroundInd=1;
+                	background.children[0].material.uniforms["texMap"].value= backgroundTexs[backgroundInd];
+                	if(!backgroundTexs[backgroundInd].animated) {
+                		background.children[0].material.uniforms["cutoff1"].value = .2;
+                		background.children[0].material.uniforms["cutoff2"].value = .9;
+                	}
+                }
+                else{
+                	background.on = false;
+                	background.children[0].material.uniforms["texMap"].value= backgroundTexs[0]; 
+                }
+            });
+            var selectBuffer=[];
+          	selectBuffer[0]=0;
+            selectBuffer[1]=0;
+            selectBuffer[2]=0;
+            var textureSelect= {};
+            textureSelect.val=0;
+            textureSelect.selected=[];
+            textureSelect.selected[0]=0;
+            textureSelect.selected[1]=0;
+            textureSelect.selected[2]=0;
+
+            socket.on('textureSelect', function(message) {
+            	var val = message-selectBuffer[0];
+            	var t1=selectBuffer[1];
+            	selectBuffer[2]=t1;
+            	selectBuffer[1]=selectBuffer[0];
+            	selectBuffer[0]=message;
+            	//console.log(val);
+            	if(Math.abs(val)>98){
+            		var sign=Math.sign(val);
+            		if(Math.abs(val)>150){
+            			sign*=-1;
+            		}
+            		textureSelect.selected[0]+=sign;
+            		if(textureSelect.selected[0]<0)
+            			textureSelect.selected[0]=9;
+            		textureSelect.selected[0]=textureSelect.selected[0]%10;
+            		updateTextureSelect(sceneShaded);
+            	}
+            	else if(Math.abs(val)>5){
+            		var sign=Math.sign(val);
+            		if(Math.abs(val)>70){
+            			sign*=-1;
+            		}
+            		textureSelect.selected[1]+=sign;
+            		if(textureSelect.selected[1]<0)
+            			textureSelect.selected[1]=9;
+            		textureSelect.selected[1]=textureSelect.selected[1]%10;
+            		updateTextureSelect(sceneShaded);
+            	}/*
+            	else if(Math.abs(val)<5){
+            		if(selectBuffer[0]==selectBuffer[1]&&selectBuffer[1]==selectBuffer[2]){
+            			textureSelect.selected[2]++;
+						textureSelect.selected[2]=textureSelect.selected[2]%10;            	
+            			updateTextureSelect(sceneShaded);
+            		}
+            	}*/
+            	//console.log(textureSelect.selected);
+            	
+            });
+	
+			var lastMessage=0;
+			socket.on('turny', function(message) {
+				if(Math.abs(lerps[5].goal-message)>5){
+					lerps[5].goal=message;
+					lerps[5].counter=0;
+				}
+
+				//console.log(Math.PI*(message-lastMessage)/60);
+                //camera.rotateOnAxis(new THREE.Vector3(0,0,1),Math.PI*(message-lastMessage)/600);
+                lastMessage = message;
+            });
+
+            //little panel
+            socket.on('hue', function(message) {
+                var newVal= message / 1023 * 350;
+                if(Math.abs(newVal-lerps[2].goal)>2){
+                	lerps[2].counter=0;
+                	lerps[2].goal=newVal;
+                	lerps[2].counterMax=1000;
+                }
+
+            });
+
+            socket.on('button1', function(message) {
+            	if(message == 1) {
+            		currentScheme = (currentScheme+1) % schemes.length;
+	            	scheme.sc = schemes[currentScheme];
+            	}
+            });
+
+            socket.on('button2', function(message) {
+            	if(message == 1) {
+            		currentVariation = (currentVariation+1) % variations.length;
+            		scheme.variation = variations[currentVariation];
+            	}
+            	
+            });
+
+            socket.on('shader1On', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+
+            socket.on('shader1knob', function(message) {
+            	var val=1+15*(message / 1023);
+            	if(Math.abs(lerps[6].goal-val)>.2)
+            		lerps[6].goal = 1+15*(message / 1023);
+            	
+            });
+
+            socket.on('tmiddleswitch', function(message) {
+            	if(message == 1){
+            		activeEffects[1] = true;
+            	} else {
+            		activeEffects[1] = false;
+            	}
+            });
+
+            socket.on('tblack', function(message) {
+            	if(message == 1){
+            		activeEffects[3] = true;
+            	} else {
+            		activeEffects[3] = false;
+            	}
+            });
+
+            socket.on('shader2On', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+            socket.on('shader2knob', function(message) {
+            	var val = .03*(message / 1023);
+            	if(Math.abs(val-lerps[2].goal)>(.03/1024)*3){
+                	lerps[3].counter=0;
+                	lerps[3].goal=val;
+                	lerps[3].counterMax=1000;
+                }
+            	
+            });
+
+
+            socket.on('muxBlackLever', function(message) {
+            	if(message < 500)
+            		activeEffects[2] = true;
+            	else
+            		activeEffects[2] = false;
+            	
+            });
+     
+            socket.on('shader2Arg', function(message) {
+            	
+            });
+		</script>
+	</body>
+</html>
