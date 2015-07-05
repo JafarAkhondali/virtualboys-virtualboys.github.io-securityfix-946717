@@ -1270,14 +1270,14 @@
 						if(scene.children[i].textured){
 							for(var j=0; j<3; j++){
 								var colorind = scene.children[i].colorinds[j];
-								//colorind= colorind%colors.length;
+								colorind= colorind%colors.length;
 								var rgb=hexToRgb(colors[colorind]);
 								scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,scene.children[i].material.uniforms[uniformsMaterialColor[j]].value.w);
 							}
 						}
 						else{
 							var colorind = scene.children[i].colorind;
-							//colorind= colorind%colors.length;
+							colorind= colorind%colors.length;
 							var rgb=hexToRgb(colors[colorind]);	
 							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
 						}	
