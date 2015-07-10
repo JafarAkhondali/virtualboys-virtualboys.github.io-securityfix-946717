@@ -1,3 +1,5 @@
+kaliedescope selfie generator
+
 --DEMO--
 http://virtualboys.github.io/mrdoob/examples/webgl.html
 
@@ -33,3 +35,5 @@ X: object scale
 C: object rotation
 
 patches welcome
+
+david + manny
