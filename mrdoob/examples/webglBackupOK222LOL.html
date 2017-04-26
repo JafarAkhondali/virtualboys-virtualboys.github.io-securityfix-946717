@@ -1,5 +1,3 @@
-<script src="js/node_modules/color-scheme/lib/color-scheme.min.js"></script>
-
 <!DOCTYPE html>
 <html lang="en">
 	<head>
@@ -51,42 +49,35 @@
 			<div id="info" class="hidden">
 				HALLOO
 			</div>
-			<div id="help" class="hidden" style="text-align:left;">
-				<div style="position:absolute; top:5%; left:10%">
-					H: help<br>
-					F: fullscreen
+			<div id="help" class="hidden">
+				<div style="position:absolute; top:5%; left:47%">
+					H: help
 				</div>
-				<div style="position:absolute; top:5%; left:80%">
-					UP/DOWN: change value<br>
-					LEFT/RIGHT: cycle presets
-				</div>
-				<div style="position:absolute; top:15%; left:10%">
+				<div style="position:absolute; top:10%; left:35%">
 					1: color scheme<br>
 					2: color variation<br>
 					3: background<br>
 					4: foreground<br>
 				</div>
-				<div style="position:absolute; top:15%; left:80%">
+				<div style="position:absolute; top:10%; left:55%">
 					7: scene<br>
-					8: texture/color 1<br>
-					9: texture/color 2<br>
-					0: texture/color 3
+					8: texture 1<br>
+					9: texture 2<br>
 				</div>
-				<div style="position:absolute; top:35%; left:10%">
+				<div style="position:absolute; top:30%; left:35%">
 					Q: hue<br>
 					W: opacity<br>
 					E: animation speed<br>
 					R: scene rotation<br>
 					T: zoom<br>
 				</div>
-				<div style="position:absolute; top:35%; left:80%">
+				<div style="position:absolute; top:30%; left:55%">
 					U: rgb shift<br>
 					I: fisheye<br>
 					O: grain<br>
 					P: pixelate<br>
-					double tap to enable/disable effects
 				</div>
-				<div style="position:absolute; top:55%; left:10%">
+				<div style="position:absolute; top:50%; left:35%">
 					Z: object velocity<br>
 					X: object scale<br>
 					C: object rotation<br>
@@ -97,9 +88,8 @@
 
 <video id="monitor" autoplay="" width="160" height="120" style="visibility: hidden; float:left;"></video>
 <canvas id="videoImage" width="160" height="120" style="visibility: hidden; float:left;"></canvas>
-		<!--<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"> </script>-->
-		<script src="js/jquery-3.2.1.min.js"></script>
-		<script src="js/libs/color-scheme.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"> </script>
+		<script src="js/node_modules/color-scheme/lib/color-scheme.min.js"></script>
 		<script src="../build/three.min.js"></script>
 		<script src="js/shaders/CopyShader.js"></script>
 		<script src="js/shaders/DotScreenShader.js"></script>
@@ -115,14 +105,12 @@
 		<script src="js/postprocessing/RenderPass.js"></script>
 		<script src="js/postprocessing/MaskPass.js"></script>
 		<script src="js/postprocessing/ShaderPass.js"></script>
-		<script src="js/gamepad.js"></script>
 
 		<script src="js/Detector.js"></script>
 
 		<script id="fragment_shader_screen" type="x-shader/x-fragment">
 
 			varying vec2 vUv;
-			uniform float offset;
 			uniform float cutoff1;
 			uniform float cutoff2;
 			uniform float time;
@@ -135,37 +123,28 @@
 
 			void main() {
 				vec2 uv = vec2(vUv.x, vUv.y);
-				/*uv.y +=time;
-				uv.y -= floor(uv.y);*/
+				uv.y +=time;
+				uv.y -= floor(uv.y);
 				vec4 texColor = texture2D( texMap, uv);
-				if(colorize == 0) {
+
+				if(colorize==0) {
 					gl_FragColor = texColor;
 					return;
 				}
 
-				float brightness = (texColor.r + texColor.g + texColor.b) / 3.0;
-				brightness += time;
-				if(brightness>1.0){
-					brightness -=1.0;
-				}	
-				if(brightness <= cutoff1){
-					if((cutoff1 - brightness)<(cutoff1)/2.0)
+				if(texColor.r <= cutoff1){
+					if((cutoff1-texColor.r)<(cutoff2-cutoff1)/2.0)
 						gl_FragColor = color2;
 					else
-						gl_FragColor = vec4(color2.x*.9,color2.y*.9,color2.z*.9,1);
+						gl_FragColor = vec4(color2.x*.7,color2.y*.7,color2.z*.7,1);
 				}
-				else if(brightness <= cutoff2)
-					if((cutoff2-brightness)<(cutoff2-cutoff1)/2.0)
+				else if(texColor.r <= cutoff2)
+					if((cutoff2-texColor.r)<(1.0-cutoff2)/2.0)
 						gl_FragColor = color1;
 					else
-						gl_FragColor = vec4(color1.x*.9,color1.y*.9,color1.z*.9,1);
-				else{
-					if((1.0-brightness)<(1.0-cutoff2)/2.0){
-						gl_FragColor = baseColor;
-					}
-					else
-					gl_FragColor = vec4(baseColor.x*.9,baseColor.y*.9,baseColor.z*.9,baseColor.a);;
-				}
+						gl_FragColor = vec4(color1.x*.7,color1.y*.7,color2.z*.7,1);
+				else
+					gl_FragColor = baseColor;
 			}
 
 		</script>
@@ -255,13 +234,12 @@
 			var effect,effect2,effect3,effect4;
 			var effects = [];
 			var activeEffects = [];
-			var grainEffectInd;
 
 			var numTextures = 6;
 			var numTexLoaded = 0;
 
 			//inputs
-			var animSpeed = 1;
+			var animSpeed = 100;
 			var rotateSpeed = .01;
 			var goalRotateSpeed=0;
 			var obRotSpeed=.02;
@@ -325,21 +303,13 @@
 			var currentVariation = 2;
 
 			var presets = [];
-			var currentPreset = 4;
-
-			var gamepad;
+			var currentPreset = 0;
+			
+			init();
+			//animate();
 
 			function init() {
-				gamepad = new PxGamepad();
-				gamepad.start();
-				gamepad.on("a", onAUp);
-				gamepad.on("b", onBUp);
-				gamepad.on("x", onXUp);
-				gamepad.on("y", onYUp);
-				gamepad.on("dpadDown", onDpadDown);
-				gamepad.on("rightStick", onDpadUp);
-				gamepad.on("dpadLeft", onDpadLeft);
-				gamepad.on("dpadUp", onDpadRight);
+
 				cameraRTT = new THREE.OrthographicCamera( window.innerHeight / - 2, window.innerHeight / 2, 
 					window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
 
@@ -411,32 +381,25 @@
 				effect2 = new THREE.ShaderPass( THREE.RGBShiftShader );
 				effect2.uniforms[ 'amount' ].value = 0.005;
 				effects[0] = effect2;
-				activeEffects[0] = false;
+				activeEffects[0] = true;
 
 				effect = new THREE.ShaderPass( THREE.LensShader );
 				effect.uniforms[ 'scale' ].value = .65;
 				effects[1] = effect;
-				activeEffects[1] = false;
+				activeEffects[1] = true;
 
-				/// NO GRAIN
-				// effect3 = new THREE.ShaderPass( THREE.GrainShader );
-				// effect3.uniforms[ 'textureWidth' ].value =  window.innerHeight;
-				// effect3.uniforms[ 'textureHeight' ].value =  window.innerHeight;
-				// effects[2] = effect3;
-				// activeEffects[2] = false;
-				// grainEffectInd = 2;
+				effect3 = new THREE.ShaderPass( THREE.GrainShader );
+				effect3.uniforms[ 'textureWidth' ].value =  window.innerHeight;
+				effect3.uniforms[ 'textureHeight' ].value =  window.innerHeight;
+				effects[2] = effect3;
+				activeEffects[2] = false;
 
 				effect4 = new THREE.ShaderPass( THREE.PixelateShader );
 				effect4.uniforms[ 'width' ].value =  window.innerHeight;
 				effect4.uniforms[ 'height' ].value =  window.innerHeight;
 				effect4.uniforms['pixel_size'].value = 1;
-				effects[2] = effect4;
-				activeEffects[2] = false;
-
-				// effect3 = new THREE.ShaderPass( THREE.WaveyShader );
-				// effect3.uniforms[ 'timer' ].value =  0;
-				// effects[3] = effect3;
-				// activeEffects[3] = false;
+				effects[3] = effect4;
+				activeEffects[3] = true;
 
 				initPresets();
 
@@ -481,7 +444,7 @@
 				rgbshifttex.anisotropy = 16;
 				textures[0] = rgbshifttex;
 
-				tex2 = THREE.ImageUtils.loadTexture( 'textures/squaressmall.jpg', {}, texLoadCallback);
+				tex2 = THREE.ImageUtils.loadTexture( 'textures/squares.jpg', {}, texLoadCallback);
 				tex2.anisotropy = 16;
 				textures[1] = tex2;
 
@@ -489,7 +452,7 @@
 				tex3.anisotropy = 16;
 				textures[2] = tex3;
 
-				var tex4 = THREE.ImageUtils.loadTexture( 'textures/rectanglessmall.jpg', {}, texLoadCallback);
+				var tex4 = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
 				tex4.anisotropy = 16;
 				textures[3] = tex4;
 
@@ -497,7 +460,7 @@
 				tex5.anisotropy = 16;
 				textures[4] = tex5;
 
-				var tex6 = THREE.ImageUtils.loadTexture( 'textures/8=Dsmall.jpg', {}, texLoadCallback);
+				var tex6 = THREE.ImageUtils.loadTexture( 'textures/8=D.jpg', {}, texLoadCallback);
 				tex6.anisotropy = 16;
 				textures[5] = tex6;
 
@@ -519,12 +482,12 @@
 
 				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/clouds.jpg', {}, texLoadCallback);
 				backgroundTex.anisotropy = 16;
-				backgroundTex.animated = true;
+				backgroundTex.animated = false;
 				backgroundTexs[1]= backgroundTex;
 
-				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/honeycomb.jpg', {}, texLoadCallback);
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/bowling.jpg', {}, texLoadCallback);
 				backgroundTex.anisotropy = 16;
-				backgroundTex.animated = true;
+				backgroundTex.animated = false;
 				backgroundTexs[2]= backgroundTex;
 
 				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/palm.jpg', {}, texLoadCallback);
@@ -532,17 +495,12 @@
 				backgroundTex.animated = true;
 				backgroundTexs[3]= backgroundTex;
 
-				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/honey.jpg', {}, texLoadCallback);
+				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/rectangles.jpg', {}, texLoadCallback);
 				backgroundTex.anisotropy = 16;
-				backgroundTex.animated = true;
+				backgroundTex.animated = false;
 				backgroundTexs[4]= backgroundTex;
 				backgroundInd=0;
 
-				backgroundTex = THREE.ImageUtils.loadTexture( 'textures/water.jpg', {}, texLoadCallback);
-				backgroundTex.anisotropy = 16;
-				backgroundTex.animated = true;
-				backgroundTexs[5]= backgroundTex;
-				backgroundInd=0;
 				video = document.getElementById( 'monitor' );
 	
 				videoImage = document.getElementById( 'videoImage' );
@@ -560,7 +518,7 @@
 				backgroundTex.animated = true;
 				backgroundTexs[5]= backgroundTex;
 				backgroundInd=5;
-				
+
 				foregroundTex = THREE.ImageUtils.loadTexture( 'textures/star.jpg', {}, texLoadCallback);
 				// foregroundTex.wrapS = foregroundTex.wrapT = THREE.RepeatWrapping;
 				foregroundTex.anisotropy = 16;
@@ -600,15 +558,13 @@
 					initShadedScene();
 					initTetScene();
 					initBackground();
-					setPreset(currentPreset);
 					animate();
 				}
 			}
 
 			
 			function initPresets() {
-				var i = 0;
-				presets[i++] = {
+				presets[0] = {
 					hue: 			0.677,
 					opacity: 		1,
 					animSpeed: 		.5,
@@ -623,43 +579,13 @@
 					colorScheme: 	1,
 					colorVariation: 3,
 					foreground: 	1,
-					background: 	1,
+					background: 	2,
 					currentScene: 	2,
-					textures: 		[4,4],
-					colorInds: 		[0,0,0],
-					colorize: 		1
+					textures: 		[4,4]
 				};
-				
-				presets[i++] = {
-					hue: 			0.877,
-					opacity: 		1,
-					animSpeed: 		.73,
-					sceneRotation: 	.65,
-					zoom: 			.323,
-					obVel: 			.257,
-					obScale: 		1,
-					obRot: 			1,
-					rgbShift: 		1,
-					pixelate: 		.21,
-					activeEffects: 	[0,1,3],
-					colorScheme: 	1,
-					colorVariation: 3,
-					foreground: 	0,
-					background: 	-1,
-					currentScene: 	2,
-					textures: 		[9,3],
-					colorInds: 		[0,0,0],
-					colorize: 		1
-				};
-				presets[i++] = JSON.parse("{\"hue\":0.8452352941176473,\"opacity\":1,\"animSpeed\":0.511,\"sceneRotation\":0.5265000000000004,\"zoom\":0.4210000000000003,\"colorize\":1,\"obVel\":0.31500000000000017,\"obScale\":1,\"obRot\":0.9650000000000001,\"rgbShift\":0.5670000000000004,\"pixelate\":0,\"colorScheme\":0,\"colorVariation\":1,\"currentScene\":1,\"textures\":[4,7],\"activeEffects\":[0,1],\"colorInds\":[],\"background\":-1,\"foreground\":1}");
-				presets[i++] = JSON.parse("{\"hue\":0.8098039215686281,\"opacity\":0.16599999999999926,\"animSpeed\":0.2,\"sceneRotation\":0.7260000000000002,\"zoom\":1,\"colorize\":1,\"obVel\":0.31500000000000017,\"obScale\":1,\"obRot\":0.9650000000000001,\"rgbShift\":0.0,\"pixelate\":0,\"colorScheme\":0,\"colorVariation\":0,\"currentScene\":3,\"textures\":[4,7],\"activeEffects\":[1,3],\"colorInds\":[4,0,0],\"background\":5,\"foreground\":0}");
-				presets[i++] = JSON.parse("{\"hue\":0.677,\"opacity\":0.6,\"animSpeed\":0.5,\"sceneRotation\":0.66,\"zoom\":0.2,\"colorize\":1,\"obVel\":0.1,\"obScale\":1,\"obRot\":0.1,\"rgbShift\":0.5,\"pixelate\":0,\"colorScheme\":1,\"colorVariation\":0,\"currentScene\":1,\"textures\":[5,4],\"activeEffects\":[0,1,3],\"colorInds\":[],\"background\":5,\"foreground\":1}");
-				presets[i++] = JSON.parse("{\"hue\":0.8452352941176473,\"opacity\":0.3,\"animSpeed\":0.511,\"sceneRotation\":0.5265000000000004,\"zoom\":0.5,\"colorize\":1,\"obVel\":0.31500000000000017,\"obScale\":1,\"obRot\":0.9650000000000001,\"rgbShift\":0.5670000000000004,\"pixelate\":0,\"colorScheme\":2,\"colorVariation\":0,\"currentScene\":1,\"textures\":[5,8],\"activeEffects\":[0,2],\"colorInds\":[],\"background\":3,\"foreground\":0}");
 			}
 
 			function setPreset(i) {
-				freezeInput();
-
 				var p = presets[i];
 				keyMap.Q.value = p.hue;
 				keyMap.W.value = p.opacity;
@@ -675,114 +601,10 @@
 				currentVariation = p.colorVariation;
 				currentScene = p.currentScene;
 
-				updateParams();
+				initColorScheme(scenes[(currentScene+1) % scenes.length], scheme);
 
-				scheme.sc = schemes[currentScheme];
-				scheme.variation = variations[currentVariation];
-				initColorScheme(getCurrentScene(), scheme);
-				textureSelect.selected[0] = p.textures[0];
-				textureSelect.selected[1] = p.textures[1];
-
-				for(var i = 0; i < activeEffects.length; i++)
-					activeEffects[i] = true;
-
-				updateTextureSelect(sceneShaded);
-				updateTextureSelect(sceneTet);
-
-				// setColorInds(p.colorInds, sceneTorus);
-				// setColorInds(p.colorInds, sceneTorus2);
-
-				background.children[0].material.uniforms["colorize"].value = p.colorize;
-			
-				if(p.background == -1) {
-					background.on = false;
-					background.children[0].material.uniforms["texMap"].value= backgroundTexs[0]; 
-				}
-				else {
-	            	background.on = true;
-	            	backgroundInd=p.background;
-	            	background.children[0].material.uniforms["texMap"].value= backgroundTexs[backgroundInd];
-	            	
-	            	if(!backgroundTexs[backgroundInd].animated) {
-	            		background.children[0].material.uniforms["cutoff1"].value = .2;
-	            		background.children[0].material.uniforms["cutoff2"].value = .9;
-	            	}
-            	}
-
-            	foreground.children[0].material.uniforms["colorize"].value = 1;
-            	if(p.foreground == -1)
-            		foreground.on = false;
-            	else {
-	            	foreground.on = true;
-	            		foregroundInd=p.foreground;
-	            	foreground.children[0].material.uniforms["texMap"].value= foregroundTexs[foregroundInd];
-	            	foreground.children[0].material.uniforms["baseColor"].value =new THREE.Vector4(0, 0,0,0);
-	            	if(!foregroundTexs[foregroundInd].isMask) {
-	            		foreground.children[0].material.uniforms["color1"].value.w = .25;
-	            		foreground.children[0].material.uniforms["color2"].value.w = .5;
-	            	} else {
-	            		foreground.children[0].material.uniforms["color1"].value.set(0,0,0,1);
-	            		foreground.children[0].material.uniforms["color2"].value.set(0,0,0,1);
-	            		foreground.children[0].material.uniforms["cutoff1"].value = .5;
-	            		foreground.children[0].material.uniforms["cutoff2"].value = .9;
-	            		foreground.children[0].material.uniforms["time"].value = 0;
-	            	}
-            	}
 			}
 			
-			function savePreset() {
-				var preset = {
-					hue: 			keyMap.Q.value,
-					opacity: 		keyMap.W.value,
-					animSpeed: 		keyMap.E.value,
-					sceneRotation: 	keyMap.R.value,
-					zoom: 			keyMap.T.value,
-					obVel: 			keyMap.Z.value,
-					obScale: 		keyMap.X.value,
-					obRot: 			keyMap.C.value,
-					rgbShift: 		keyMap.U.value,
-					pixelate: 		keyMap.P.value,
-					colorScheme: 	currentScheme,
-					colorVariation: currentVariation,
-					currentScene: 	currentScene,
-					textures: 		[],
-					activeEffects:  [],
-					colorInds: 		[],
-				};
-
-				for(var i = 0; i < activeEffects.length; i++)
-					if(activeEffects[i])
-						preset.activeEffects.push(i);
-
-				if(!background.on)
-					preset.background = -1;
-				else
-					preset.background = backgroundInd;
-
-				if(!foreground.on)
-					preset.foreground = -1;
-				else
-					preset.foreground = foregroundInd;
-
-				preset.textures[0] = textureSelect.selected[0];
-				preset.textures[1] = textureSelect.selected[1];
-
-				var cScene = getCurrentScene();
-				if(!cScene.children[0].textured) {
-					for(var i = 0; i < 3; i++) {
-						preset.colorInds[i] = cScene.children[i].colorind;
-					}
-				}
-
-				console.log(JSON.stringify(preset));
-			}
-
-			function setColorInds(inds, scene) {
-        		for(var i = 0; i < 3; i++) {
-        			var ob = scene.children[i];
-	        		ob.colorind = inds[i];
-        		}
-			}
 
 			function initBackground() {
 				var quad = new THREE.PlaneBufferGeometry(camSize,camSize/aspect);
@@ -797,10 +619,8 @@
 						color2: { type: "v4", value : new THREE.Vector4(1,.69,.4,0) }, 
 						cutoff1: { type:"1f", value: 0}, 
 						cutoff2: { type:"1f", value: .5}, 
-						time: { type:"1f", value: 0},
-						offset: {type:"1f", value:0},
-						colorize: {type:"1i", value:1}
-					},
+						time: { type:"1f", value: 0}, 
+						colorize: {type:"i", value: 0} },
 					vertexShader: document.getElementById( 'vertexShader' ).textContent,
 					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
 
@@ -827,8 +647,7 @@
 						cutoff1: { type:"1f", value: .3}, 
 						cutoff2: { type:"1f", value: .6}, 
 						time: { type:"1f", value: 0},
-						offset: { type:"1f", value: 0},
-						colorize: { type:"1i", value: 1} },
+						colorize: { type:"i", value: 1} },
 					vertexShader: document.getElementById( 'vertexShader' ).textContent,
 					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
 				} );
@@ -858,7 +677,7 @@
 						cutoff1: { type:"1f", value: .05}, 
 						cutoff2: { type:"1f", value: .9}, 
 						time: { type:"1f", value: 0},
-						colorize: { type:"1i", value: 1} },
+						colorize: { type:"i", value: 1 } },
 					vertexShader: document.getElementById( 'vertexShader' ).textContent,
 					fragmentShader: document.getElementById( 'fragment_shader_screen' ).textContent,
 
@@ -957,8 +776,7 @@
 			}
 
 			function initTorusScene() {
-				var tSceneScale = 2;
-				var geometry = new THREE.TorusGeometry(tSceneScale * 170,tSceneScale * 30,32,32);
+				var geometry = new THREE.TorusGeometry(110,20,32,32);
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0xFF5C80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 
@@ -978,7 +796,7 @@
 
 				sceneTorus.add( torus );
 
-				var geometry = new THREE.TorusGeometry( tSceneScale * 120, tSceneScale * 40, 32,32 );
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -994,25 +812,22 @@
 				setupMoveOb(torus);
 
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( tSceneScale * 70, 32, 32 );
-				var material = new THREE.MeshLambertMaterial( {color: 0x5C80FF,shading:THREE.FlatShading} );
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
-				geometry = new THREE.BoxGeometry(200,200,200);
-				geometry = new THREE.TetrahedronGeometry(tSceneScale * 150,1);
 				var sphere = new THREE.Mesh( geometry, material );
 				//sphere.textured=true;
 				sphere.position.set(100,50,100);
 				sphere.scale.set(2.2,2.2,2.2);
 				sphere.baseScale = 2.2;
-				sphere.rotAxis = new THREE.Vector3(1,1,0).normalize();
-				sphere.rotSpeed =.1;
+				sphere.rotSpeed =0;
 				sphere.p1= new THREE.Vector3(300,20,100);
 				sphere.p2= new THREE.Vector3(-300,-20,100);
 				sphere.speed=1;
 				setupMoveOb(sphere);
 
 				sceneTorus.add( sphere );
-				var geometry = new THREE.TorusGeometry( tSceneScale * 120, tSceneScale * 40, 32,32 );
+				var geometry = new THREE.TorusGeometry( 80, 20, 32,32 );
 				var mat1 = new THREE.MeshBasicMaterial( { color: 0x5CFF80 ,side:THREE.DoubleSide,shading: THREE.FlatShading} );
 				//mat1 = genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var torus = new THREE.Mesh(geometry, mat1);
@@ -1027,8 +842,7 @@
 				torus.speed=2;
 				setupMoveOb(torus);
 			    sceneTorus.add(torus);
-				var geometry = new THREE.SphereGeometry( tSceneScale * 70, 32, 32 );
-				//geometry = new THREE.CubeGeometry(70);
+				var geometry = new THREE.SphereGeometry( 50, 32, 32 );
 				var material = new THREE.MeshBasicMaterial( {color: 0x5C80FF} );
 				//material= genTexturedMat(rgbshifttex, new THREE.Vector4(1,.6,1,1), new THREE.Vector4(.6,.1,1,1), new THREE.Vector4(1,1,.6,1));
 				var sphere = new THREE.Mesh( geometry, material );
@@ -1042,14 +856,6 @@
 				sphere.speed=1.4;
 				setupMoveOb(sphere);
 				sceneTorus.add( sphere );
-
-				var light = new THREE.DirectionalLight( 0xffffff, 1);
-				light.position.set(1,0,0);
-				sceneTorus.add(light);
-
-				light = new THREE.AmbientLight(0x404040);
-				sceneTorus.add(light);
-
 				scheme = new ColorScheme;
  				scheme.from_hue(hue) 
  				.scheme(schemes[currentScheme])   
@@ -1236,6 +1042,7 @@
 				for(var i =0; i<scene.children.length; i++){
 
 					if(scene.children[i].textured){
+						console.log(textureSelect[i]%textures.length);
 						scene.children[i].material.uniforms["texMap"].value= textures[textureSelect.selected[i]%textures.length]; 
 						scene.children[i].material.uniforms["texMap"].needsUpdate = true;
 					}
@@ -1299,35 +1106,20 @@
 						if(scene.children[i].textured){
 							for(var j=0; j<3; j++){
 								var colorind = scene.children[i].colorinds[j];
-								colorind= colorind%colors.length;
+								//colorind= colorind%colors.length;
 								var rgb=hexToRgb(colors[colorind]);
 								scene.children[i].material.uniforms[uniformsMaterialColor[j]].value= new THREE.Vector4(rgb.r,rgb.g,rgb.b,scene.children[i].material.uniforms[uniformsMaterialColor[j]].value.w);
 							}
 						}
 						else{
 							var colorind = scene.children[i].colorind;
-							colorind= colorind%colors.length;
+							//colorind= colorind%colors.length;
 							var rgb=hexToRgb(colors[colorind]);	
 							scene.children[i].material.color.setRGB(rgb.r,rgb.g,rgb.b);
 						}	
 					}
 				}
 			}
-
-			function incColorInd(ob, scheme) {
-				var schemenew = new ColorScheme;
-				schemenew.from_hue(lerps[2].current) 
- 				.scheme(scheme.sc)   
-        		.variation(scheme.variation);
-        		schemenew.hue=lerps[2].current;
-        		schemenew.sc=scheme.sc;
-        		schemenew.variation=scheme.variation;
-        		scheme=schemenew;
-
-        		ob.colorind += 4;
-        		ob.colorind = ob.colorind % scheme.colors().length;
-			}
-
 			function hexToRgb(hex) {
     			var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     			return result ? {
@@ -1335,10 +1127,6 @@
         			g: (parseInt(result[2], 16))/256.0,
         			b: (parseInt(result[3], 16))/256.0
     			} : null;
-			}
-
-			function getCurrentScene() {
-				return scenes[(currentScene+1) % scenes.length];
 			}
 
 			function initKaleidescopeScene() {
@@ -1411,32 +1199,25 @@
             	ob.p2 = ob.basePos.clone().sub(dir);
 
 			}
-
 			var counter=0;
 			var t=0;
 			var lerpTime = 50;
 			function animate() {
-
-				gamepad.update();
-				getInputFromGamepad();
 
 				if(currentKey != "")
 					showLabel(keyMap[currentKey].label, keyMap[currentKey].mapping(keyMap[currentKey].value));
 
 				zoom();
 				for(var i=0; i<lerps.length;i++){
-					if(i != 1) {
-					lerps[i].current = lerps[i].goal;
-				} else {
 					var d = lerps[i].goal - lerps[i].current;
 					lerps[i].current += d / lerpTime;
 				}
-				}
-				updateParams();
+				//updateParams();
 				effect2.uniforms[ 'amount' ].value = lerps[3].current;
 				effect4.uniforms['pixel_size'].value = Math.floor(lerps[6].current);
-				//effect3.uniforms['timer'].value = counter;
 
+				t+=.0008;
+				effect3.uniforms[ 'timer' ].value = 1;
 				counter++;
 				if(counter>1000)
 					counter=0;
@@ -1547,26 +1328,19 @@
 
 			var updateCount = 0;
 			var backgroundUp = true;
-			var offset=0;
+			
 			function updateBackground() {
-				//var backP = animSpeed;
-				//var addAmt = .5 / backP;
+				var backP = animSpeed;
+				var addAmt = .5 / backP;
 				var mat = background.children[0].material;
-				offset += animSpeed / 300;
-				//console.log(mat);
-				//mat.uniforms['offset'].value =offset;
-				mat.uniforms['time'].value = offset;
+				var add = backgroundUp ? addAmt : -addAmt;
+				mat.uniforms['cutoff1'].value += add;
+				mat.uniforms['cutoff2'].value += add;
 
-				if(offset>1){
-					offset=0;
-				}
-
-				//mat.uniforms['cutoff2'].value += add;
-
-				/*if(updateCount++ >= backP) {
+				if(updateCount++ >= backP) {
 					backgroundUp = !backgroundUp;
 					updateCount = 0;
-				}*/
+				}
 			}
 
 			var updateCountF = 0;
@@ -1804,104 +1578,6 @@
 				addFrame();
 		}
 
-		function getInputFromGamepad() {
-			return;
-			keyMap.Q.value += gamepad.leftStick.y * .005;
-			keyMap.Q.value = loop(keyMap.Q.value,0,1);
-
-			keyMap.W.value += deadzone(-gamepad.rightStick.y) * .01;
-			keyMap.W.value = clamp(keyMap.W.value,0,2);
-
-			keyMap.R.value = .4 + (gamepad.leftTrigger/2);
-			//keyMap.R.value += gamepad.rightTrigger/2 -.5;
-			keyMap.T.value = gamepad.rightTrigger/2 + .7;
-
-			if(gamepad.buttons['leftTop']) {
-				keyMap.U.value -= .03;
-				keyMap.U.value = clamp(keyMap.U.value,0,2);
-			} else if(gamepad.buttons['rightTop']) {
-				keyMap.U.value += .03;
-				keyMap.U.value = clamp(keyMap.U.value,0,2);
-			}
-
-		}
-		function onDpadLeft(){
-			currentPreset=0;
-			setPreset(0);
-		}
-		function onDpadRight(){
-			currentPreset=1;
-			setPreset(1);
-		}
-		function onDpadDown(){
-			currentPreset=2;
-			setPreset(2);
-		}
-		function onDpadUp(){
-			console.log("up");
-			currentPreset=4;
-			setPreset(4);
-		}
-		function onAUp() {
-			currentScheme = (currentScheme+1) % schemes.length;
-	        scheme.sc = schemes[currentScheme];
-		}
-
-		function onXUp() {
-			currentVariation = (currentVariation+1) % variations.length;
-            scheme.variation = variations[currentVariation];
-		}
-
-		function onBUp() {
-			//if(!background.on){
-             //   	background.on = true;
-                	backgroundInd++;
-                	if(backgroundInd>backgroundTexs.length-1)
-                		backgroundInd=0;
-                	background.children[0].material.uniforms["texMap"].value= backgroundTexs[backgroundInd];
-                	if(!backgroundTexs[backgroundInd].animated) {
-                		background.children[0].material.uniforms["cutoff1"].value = .2;
-                		background.children[0].material.uniforms["cutoff2"].value = .9;
-                	}
-               // }
-               // else{
-                //	background.on = false;
-                //	background.children[0].material.uniforms["texMap"].value= backgroundTexs[0]; 
-                //}
-		}
-
-		function onYUp() {
-			currentScene = (currentScene+1) % scenes.length;
-                if(sceneFade == 0) {
-                	sceneFade = 1;
-                	initColorScheme(scenes[(currentScene+1) % scenes.length], scheme);
-                	rollScales(scenes[(currentScene+1) % scenes.length]);
-
-                	if((currentScene+1) % scenes.length == 2)
-                		updateTextures(sceneShaded);
-                }
-		}
-
-		function loop(num, min, max) {
-			if(num > max) {
-				return num-max;
-			} else if (num < min) {
-				return max + num;
-			}
-			return num;
-		}
-
-		function clamp(num, min, max) {
-			return num <= min ? min : num >= max ? max : num;
-		}
-
-		function deadzone(val) {
-			if(Math.abs(val) < .05) {
-				return 0;
-			}
-			return val;
-		}
-
 		var keyMap = {
 			Q:{ label : "hue", mapping : zero255, value : 0, step : 1.0/255 },
 			W:{ label : "opacity", mapping : zero100, value : 1, step : 1.0/100 },
@@ -1925,8 +1601,6 @@
 		document.addEventListener('keydown', function(event) {
 			var keyString = String.fromCharCode(event.keyCode);
 
-			if(keyString == "S")
-				savePreset();
 			if(keyString == "H")
 				showHelp();
 			if(keyString == "F"){
@@ -1943,9 +1617,8 @@
 			}
 
 			var dir = 0;
-			//left right
-			if(event.keyCode==38 || event.keyCode==40) {
-				dir = (event.keyCode == 38) ? 1 : -1;
+			if(event.keyCode==37 || event.keyCode==39) {
+				dir = (event.keyCode == 39) ? 1 : -1;
 				if(currentKey != "") {
 					if(incVel<5)
 						incVel+=.1;
@@ -1957,16 +1630,8 @@
 					}
 				}
 			}
-			//up down
-			else if(event.keyCode==37 || event.keyCode == 39){
-				if(event.keyCode==39) {
-					currentPreset = (++currentPreset) % presets.length;
-				} else {
-					currentPreset--;
-					if(currentPreset < 0)
-						currentPreset = presets.length-1;
-				}
-				setPreset(currentPreset);
+
+			else if(event.keyCode==38){
 			}
 			else if(keyMap[keyString]) {
 				currentKey = keyString;
@@ -2017,15 +1682,8 @@
         textureSelect.selected[1]=0;
         textureSelect.selected[2]=0;
 
-        
-
 		//keys that cycle through values
 		function cycleEvent(key) {
-			var scene = getCurrentScene();
-	        var isTexturedScene = false;
-	        if(scene == sceneTet || scene == sceneShaded)
-	        	isTexturedScene = true;
-
 			if(key == "1") {
 				currentScheme = (currentScheme+1) % schemes.length;
 	            scheme.sc = schemes[currentScheme];
@@ -2083,35 +1741,21 @@
                 		updateTextures(sceneShaded);
                 }
 			} else if(key == "8") {
-				if(!isTexturedScene) {
-					inrocColorInd(scene.children[0], scheme);
-				} else {
-					textureSelect.selected[0]=(++textureSelect.selected[0])%10;
-					updateTextureSelect(sceneShaded);
-					updateTextureSelect(sceneTet);
-				}
+				textureSelect.selected[0]=(++textureSelect.selected[0])%10;
+				updateTextureSelect(sceneShaded);
+				updateTextureSelect(sceneTet);
 			} else if(key == "9") {
-				if(!isTexturedScene) {
-					incColorInd(scene.children[1], scheme);
-				} else {
-					textureSelect.selected[1]=(++textureSelect.selected[1])%10;
-					updateTextureSelect(sceneShaded);
-					updateTextureSelect(sceneTet);
-				}
+				textureSelect.selected[1]=(++textureSelect.selected[1])%10;
+				updateTextureSelect(sceneShaded);
+				updateTextureSelect(sceneTet);
 			} else if(key == "0") {
-				if(!isTexturedScene) {
-					incColorInd(scene.children[2], scheme);
-				} else {
-					textureSelect.selected[2]=(++textureSelect.selected[2])%10;
-					updateTextureSelect(sceneShaded);
-					updateTextureSelect(sceneTet);
-				}
+				textureSelect.selected[2]=(++textureSelect.selected[2])%10;
+				updateTextureSelect(sceneShaded);
+				updateTextureSelect(sceneTet);
 			}
 		}
 
-		//disabled
 		function doubleTap(key) {
-			return;
 			if(key == "U") {
 				activeEffects[0] = !activeEffects[0];
 			} else if(key == "I") {
@@ -2176,14 +1820,13 @@
 
 			//hue
 			if(keyMap.Q.mapping(keyMap.Q.value)!=lerps[2].goal){
-				lerps[2].goal=keyMap.Q.mapping(keyMap.Q.value);
-				//lerps[2].goal=lerps[2].current
+				lerps[2].current=keyMap.Q.mapping(keyMap.Q.value);
+				lerps[2].goal=lerps[2].current
 				lerps[2].counter=0;
 			}
 
 			//opacity
-			lerps[5].goal = keyMap.W.value*1000;
-			lerps[5].counter=0;
+			lerps[5].current = keyMap.W.value*1000;
 			/*if(keyMap.O.value!=lerps[5].goal){
 				lerps[5].goal=keyMap.O.value*1000;
 				lerps[5].current=lerps[5].goal;
@@ -2191,12 +1834,10 @@
 			}*/
 			
 			//scene rot
-			lerps[0].goal = (keyMap.R.value - .5) * .0055;
-			lerps[0].counter=0;
+			lerps[0].current = (keyMap.R.value - .5) * .015;
 
 			//ob scale
 			lerps[4].goal = keyMap.X.value;
-			lerps[4].counter=0;
 
 			//ob vel
 			obSpeed = keyMap.Z.value * 5;
@@ -2205,71 +1846,27 @@
 			obRotSpeed = (keyMap.C.value - .5) * .22;
 
 			//anim spd
-			animSpeed = keyMap.E.value;
+			animSpeed = 50+400*(1-keyMap.E.value);
 
 			//zoom
-			//if(keyMap.T.value*800 + 400!=lerps[1].goal){
+			if(keyMap.T.value*800 + 400!=lerps[1].goal){
 				lerps[1].goal=keyMap.T.value * 800 + 400;
-				//lerps[1].counter=0;
-			//}
+				lerps[1].counter=0;
+			}
 
 			//pixelate
-			//lerps[6].current = 1+15*keyMap.P.value;
-			lerps[6].goal = 1+15*keyMap.P.value;
-			lerps[6].counter=0;
+			lerps[6].current = 1+15*keyMap.P.value;
 
 			//rgbshift
-			lerps[3].goal = .03*keyMap.U.value;
-			lerps[3].counter = 0;
+			lerps[3].current = .03*keyMap.U.value;
 
 		}
 
-		var freezeThreshold = 8;
-		var inputSample = {
-			rotate: { frozen: true, value: -1 },
-			opacity: { frozen: true, value: -1 },
-			animSpeed: { frozen: true, value: -1 },
-			zoom: { frozen: true, value: -1 },
-			obSpeed: { frozen: true, value: -1 },
-			obScale: { frozen: true, value: -1 },
-			obRot: { frozen: true, value: -1 },
-			hue: { frozen: true, value: -1 },
-			rgbShift: { frozen: true, value: -1 },
-			pixelate: { frozen: true, value: -1 }
-		};
 
-		function freezeInput() {
-			for(var key in inputSample) {
-				if (inputSample.hasOwnProperty(key)) {
-			      inputSample[key].frozen = true;
-			      inputSample[key].value = -1;
-			   }
-			}
-		}
 
-		function testFreezeThreshold(varName, value) {
-			if(inputSample[varName].frozen) {
-        		if(inputSample[varName].value == -1) {
-        			inputSample[varName].value = value;
-        			return false;
-        		} else if(Math.abs(inputSample[varName].value - value) > freezeThreshold) {
-        			inputSample[varName].frozen = false;
-        			return true;
-        		} else {
-        			return false;
-        		}
-        	}
 
-        	return true;
-		}
-
-		init();
-
-	    /*var socket = io.connect('http://localhost:8080');
+	    var socket = io.connect('http://localhost:8080');
             socket.on('rotate', function(message) {
-            	if(!testFreezeThreshold('rotate', message))
-            		return;
-
                 var newVal = (message / 1023-.5)  * .015;
                 if(Math.abs(newVal-lerps[0].goal)>.005){
                 	lerps[0].counterMax=1000;
@@ -2280,22 +1877,18 @@
 
 
             socket.on('animSpeed', function(message) {
-				if(!testFreezeThreshold('animSpeed', message))
-            		return;
-
-                animSpeed = message/1024;
+                animSpeed = 50+400*(1-message/1024);
             });
 
             socket.on('zoom', function(message) {
-            	if(!testFreezeThreshold('zoom', message))
-            		return;
-
                 var newVal =message / 1023  * 800.0 + 400;
                  if(Math.abs(newVal-lerps[1].goal)>5){
                 	lerps[1].goal =newVal;
                 	lerps[1].counter=0;
                 }
             });
+
+
 
             socket.on('obDist', function(message) {
             	for(var i = 0; i < sceneTet.children.length; i++) {
@@ -2308,9 +1901,6 @@
             	}
             });
             socket.on('obRot', function(message) {
-            	if(!testFreezeThreshold('obRot', message))
-            		return;
-
             	var rotSpeed = .12 * (message / 1023 - .5);
 
             	obRotSpeed=rotSpeed;
@@ -2319,9 +1909,6 @@
             	//sceneShaded.children[0].rotSpeed = rotSpeed;
             });
             socket.on('obScale', function(message) {
-            	if(!testFreezeThreshold('obScale', message))
-            		return;
-
             	var scale = (message / 1023)*(message / 1023)+.75;
             	if(Math.abs(scale-lerps[4].goal)>.01){
                 	lerps[4].goal =scale;
@@ -2333,9 +1920,6 @@
             });
 
             socket.on('obSpeed', function(message) {
-            	if(!testFreezeThreshold('obSpeed', message))
-            		return;
-
                 obSpeed = 10 * (message / 1023 - .5);
                 obSpeed = Math.abs(obSpeed);
 
@@ -2344,24 +1928,7 @@
                 obRotAxisScale = (message / 1023 + .5);
             });
             socket.on('blackButton', function(message) {
-            	currentPreset = (++currentPreset) % presets.length;
-				setPreset(currentPreset);
-				return;
-            });
-
-
-           	socket.on('ledSwitch', function(message) {
-           		if(backgroundInd != 5)
-           			return;
-           		if(message == 1) {
-           			background.children[0].material.uniforms["colorize"].value = 1;
-           		} else {
-           			background.children[0].material.uniforms["colorize"].value = 0;
-           		}	
-           	});
-
-            socket.on('lightButton1', function(message) {
-            	currentScene = (currentScene+1) % scenes.length;
+                currentScene = (currentScene+1) % scenes.length;
                 if(sceneFade == 0) {
                 	sceneFade = 1;
                 	initColorScheme(scenes[(currentScene+1) % scenes.length], scheme);
@@ -2370,8 +1937,9 @@
                 	if((currentScene+1) % scenes.length == 2)
                 		updateTextures(sceneShaded);
                 }
-                
-                /*if(message == 1){
+            });
+            socket.on('lightButton1', function(message) {
+                if(message == 1){
                 	foreground.on = true;
                 	foregroundInd++;
                 	if(foregroundInd>foregroundTexs.length-1)
@@ -2391,10 +1959,9 @@
                 }
                 else{
                 	foreground.on = false;
-                }*/
-            /*});
+                }
+            });
             socket.on('lightButton2', function(message) {
-            	background.children[0].material.uniforms["colorize"].value = 1;
                 if(message == 1){
                 	background.on = true;
                 	backgroundInd++;
@@ -2411,7 +1978,6 @@
                 	background.children[0].material.uniforms["texMap"].value= backgroundTexs[0]; 
                 }
             });
-
             var selectBuffer=[];
           	selectBuffer[0]=0;
             selectBuffer[1]=0;
@@ -2423,68 +1989,58 @@
             textureSelect.selected[1]=0;
             textureSelect.selected[2]=0;
 
-            function changeTex(ind, sign) {
-            	var scene = getCurrentScene();
-            	var isTexturedScene = false;
-	        	if(scene == sceneTet || scene == sceneShaded)
-	        		isTexturedScene = true;
-
-            	if(!isTexturedScene) {
-						incColorInd(scene.children[ind], scheme);
-				} else {
-            		textureSelect.selected[ind]+=sign;
-            		if(textureSelect.selected[ind]<0)
-            			textureSelect.selected[ind]=9;
-            		textureSelect.selected[ind]=textureSelect.selected[ind]%10;
-            		updateTextureSelect(sceneShaded);
-					updateTextureSelect(sceneTet);
-        		}
-            }
-
             socket.on('textureSelect', function(message) {
             	var val = message-selectBuffer[0];
-            	var sign=Math.sign(val);
-            	if(Math.abs(val)>150){
-        			sign*=-1;
-        		}
-
-            	if(Math.abs(val)>98){
-            		changeTex(0, sign);
-            	}
-            	else if(Math.abs(val)>5){
-            		changeTex(1, sign);
-            	}
-            	else if(Math.abs(val)>0){
-            		if(selectBuffer[0]==selectBuffer[1]&&selectBuffer[1]==selectBuffer[2]){
-            			changeTex(2, sign);
-            		}
-            	}
-
             	var t1=selectBuffer[1];
             	selectBuffer[2]=t1;
             	selectBuffer[1]=selectBuffer[0];
             	selectBuffer[0]=message;
+
+            	if(Math.abs(val)>98){
+            		var sign=Math.sign(val);
+            		if(Math.abs(val)>150){
+            			sign*=-1;
+            		}
+            		textureSelect.selected[0]+=sign;
+            		if(textureSelect.selected[0]<0)
+            			textureSelect.selected[0]=9;
+            		textureSelect.selected[0]=textureSelect.selected[0]%10;
+            		updateTextureSelect(sceneShaded);
+            	}
+            	else if(Math.abs(val)>5){
+            		var sign=Math.sign(val);
+            		if(Math.abs(val)>70){
+            			sign*=-1;
+            		}
+            		textureSelect.selected[1]+=sign;
+            		if(textureSelect.selected[1]<0)
+            			textureSelect.selected[1]=9;
+            		textureSelect.selected[1]=textureSelect.selected[1]%10;
+            		updateTextureSelect(sceneShaded);
+            	}/*
+            	else if(Math.abs(val)<5){
+            		if(selectBuffer[0]==selectBuffer[1]&&selectBuffer[1]==selectBuffer[2]){
+            			textureSelect.selected[2]++;
+						textureSelect.selected[2]=textureSelect.selected[2]%10;            	
+            			updateTextureSelect(sceneShaded);
+            		}
+            	}*/
             	
             });
 	
 			var lastMessage=0;
 			socket.on('opacity', function(message) {
-				if(!testFreezeThreshold('opacity', message))
-            		return;
-
 				if(Math.abs(lerps[5].goal-message)>5){
 					lerps[5].goal=message;
 					lerps[5].counter=0;
 				}
 
+                //camera.rotateOnAxis(new THREE.Vector3(0,0,1),Math.PI*(message-lastMessage)/600);
                 lastMessage = message;
             });
 
             //little panel
             socket.on('hue', function(message) {
-            	if(!testFreezeThreshold('hue', message))
-            		return;
-
                 var newVal= message / 1023 * 350;
                 if(Math.abs(newVal-lerps[2].goal)>2){
                 	lerps[2].counter=0;
@@ -2509,22 +2065,45 @@
             	
             });
 
-            //pixelate
-            socket.on('shader1knob', function(message) {
-            	if(!testFreezeThreshold('pixelate', message))
-            		return;
+            socket.on('shader1On', function(message) {
+            	if(message > 500) {
 
+            	} else {
+
+            	}
+            });
+
+            socket.on('shader1knob', function(message) {
             	var val=1+15*(message / 1023);
             	if(Math.abs(lerps[6].goal-val)>.2)
-            		lerps[6].goal = 1+15*(message / 1024);
+            		lerps[6].goal = 1+15*(message / 1023);
             	
             });
 
-            //rgb shift
-            socket.on('shader2knob', function(message) {
-            	if(!testFreezeThreshold('rgbShift', message))
-            		return;
+            socket.on('tmiddleswitch', function(message) {
+            	if(message == 1){
+            		activeEffects[1] = true;
+            	} else {
+            		activeEffects[1] = false;
+            	}
+            });
 
+            socket.on('tblack', function(message) {
+            	if(message == 1){
+            		activeEffects[3] = true;
+            	} else {
+            		activeEffects[3] = false;
+            	}
+            });
+
+            socket.on('shader2On', function(message) {
+            	if(message > 500) {
+
+            	} else {
+
+            	}
+            });
+            socket.on('shader2knob', function(message) {
             	var val = .03*(message / 1023);
             	if(Math.abs(val-lerps[2].goal)>(.03/1024)*3){
                 	lerps[3].counter=0;
@@ -2534,28 +2113,19 @@
             	
             });
 
-            socket.on('tmiddleswitch', function(message) {
-            	if(message == 1){
-            	} else {
-            	}
-            });
 
-            socket.on('tblack', function(message) {
-            		activeEffects[1] = !activeEffects[1];
-            });
-
-            socket.on('bblack', function(message) {
-            	if(message == 1){
-            	} else {
-            	}
-            });
-
-            // fish eye
             socket.on('muxBlackLever', function(message) {
-            	if(message > 500){
-            	} else {
-            	}
-            });*/
+            	if(message < 500)
+            		activeEffects[2] = true;
+            	else
+            		activeEffects[2] = false;
+            	
+            });
+     
+            socket.on('shader2Arg', function(message) {
+            	
+            });
+
 
 		</script>
 	</body>
