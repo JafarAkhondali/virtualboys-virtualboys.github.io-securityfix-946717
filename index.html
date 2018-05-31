@@ -1,42 +1,46 @@
-<script src="node_modules/three/three.min.js"></script>
-<script>
- 
-    var camera, scene, renderer;
-    var geometry, material, mesh;
- 
-    init();
-    animate();
- 
-    function init() {
- 
-        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
-        camera.position.z = 1000;
- 
-        scene = new THREE.Scene();
- 
-        geometry = new THREE.BoxGeometry( 200, 200, 200 );
-        material = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true } );
- 
-        mesh = new THREE.Mesh( geometry, material );
-        scene.add( mesh );
- 
-        renderer = new THREE.CanvasRenderer();
-        renderer.setSize( window.innerWidth, window.innerHeight );
- 
-        document.body.appendChild( renderer.domElement );
- 
-    }
- 
-    function animate() {
- 
-        // note: three.js includes requestAnimationFrame shim 
-        requestAnimationFrame( animate );
- 
-        mesh.rotation.x += 0.01;
-        mesh.rotation.y += 0.02;
- 
-        renderer.render( scene, camera );
- 
-    }
- 
-</script> 
+<!doctype html>
+<html>
+<head>
+	<meta charset="ISO-8859-1">
+    <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+    <meta name="description" content="Manny Momot makes video games.">
+    <meta name=”robots” content=”noodp”>
+	<meta name="keywords" content="Manny, Momot, Emmanuel, video games, virtual buddies">
+	<meta name="author" content="Manny Momot">
+
+	<link rel="stylesheet" href="style.css">
+	<link id="favicon" rel="shortcut icon" href="images/favicon.ico" />
+
+	<title>Manny Momot Video Games</title>
+</head>
+
+<body>
+	<table>
+		<tr>
+			<td valign="top">
+				<div class="side-bar" style="padding-left:20px;">
+					<h2><a href="index.html">HOME</a></h2>
+					<h2><a href="wizmud.html">WIZMUD</a></h2>
+					<h2><a href="wackanol.html">W.A.O.</a></h2>
+					<h2><a href="https://virtual-buddies.tumblr.com/">OTHER</a></h2>
+				</div>
+			</td>
+			<td valign="top" style="padding-left:40px">	
+				<div class="game-content">
+					<h1>
+					Emmanuel Momot
+					</h1>
+
+					<h2 style="font-size:23px;font-family:Helvetica;font-weight:lighter;text-align: justify;""> 
+						I make video games, usually with Tyler Cauthen, David Califf, &amp; Tristan Whitehill. Responsible for all things code-related.
+						<br><br>
+						emanmomot@gmail.com
+					</h2>
+					<br><br><img src="images/facekscope.gif" alt="My Face." style="border-radius: 50%; width:60%margin-left: auto;
+    margin-right: auto;display:block"><br>
+				</div>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>

@@ -1,0 +1,46 @@
+@font-face{
+  font-family: Alagard;
+  src: url(fonts/alagard.ttf);
+
+}
+
+
+ html,div,canvas { margin: 0; padding: 0; width: 100%; -webkit-font-smoothing : none; font-smooth: never;}
+ ::-moz-selection { color: #333; text-shadow: none; }
+ ::selection {  color: #333; text-shadow: none; }
+ .clear:after { visibility: hidden; display: block; font-size: 0; content: " "; clear: both; height: 0; }
+ .clear { display: inline-table; clear: both; }
+ /* Hides from IE-mac \*/ * html .clear { height: 1%; } .clear { display: block; } /* End hide from IE-mac */
+
+ body {
+  font-family: Arial;
+  font-size: 20;
+ }
+
+h1 {
+  font-size:50px; text-align:center;
+  font-family: Helvetica;
+  font-weight: bold;
+}
+
+h2 {
+  font-family: Helvetica;
+  font-size: 40;
+}
+
+img {
+  width:100%;
+}
+.side-bar {
+  width:40%;
+}
+.game-content {
+  width:50%;
+}
+
+.wiz-mud {
+  font-family: Alagard;
+  font-size: 100;
+}
+
+
