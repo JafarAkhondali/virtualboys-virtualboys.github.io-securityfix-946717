@@ -11,6 +11,7 @@ scene.add( light );
 
 var controls = new THREE.OrbitControls( camera );
 var basicMat = new THREE.MeshBasicMaterial( { color: "#433F81" } );
+basicMat.wireframe = true;
 var phongMat = new THREE.MeshPhongMaterial( { color: "#F33F81" } );
 
 var renderer = new THREE.WebGLRenderer({antialias:true});
@@ -34,8 +35,8 @@ world.solver.iterations = 50;
 
 var radius = .2;
 var segmentCount = 5;
-var ringCount = 4;
-var numCps = 6;
+var ringCount = 5;
+var numCps = 15;
 
 var points = [];
 for(var i = 0; i < numCps; i++) {
@@ -52,7 +53,7 @@ var r = .3;
 for(var i = 0; i < points.length; i++) {
 	var newMesh = new THREE.Mesh( new THREE.SphereBufferGeometry( r, 20, 10 ), basicMat );
 	newMesh.position.copy(points[i]);
-	scene.add( newMesh );
+	// scene.add( newMesh );
 	sphereMeshes.push(newMesh);
 
 	var sphereBody = new CANNON.Body({
@@ -93,7 +94,7 @@ for(var i = 0; i < points.length; i++) {
 var meshBuilder = new MeshBuilder(points.length, ringCount, segmentCount, radius);
 meshBuilder.updateGeometry(sphereMeshes);
 
-var cube = new THREE.Mesh( meshBuilder.geometry, phongMat );
+var cube = new THREE.Mesh( meshBuilder.geometry, basicMat );
 
 // Add cube to Scene
 scene.add( cube );
