@@ -15,6 +15,7 @@
 </head>
 
 <body>
+	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
 	<table>
 		<tr>
 			<td valign="top">
@@ -44,4 +45,13 @@
 		</tr>
 	</table>
 </body>
+	<script src="newTHREE/three.min.js"></script>
+	<script src="cannon.min.js"></script>
+	<script src="utils.js"></script>
+	<script src="procmesh.js"></script>
+	<script src="hambod.js"></script>
+
+	<script type="text/javascript">
+		initBod(1,5,5,10,20, HAMBOD.wireframe);
+	</script>
 </html>

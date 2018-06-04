@@ -1,4 +1,18 @@
 
+var HAMBOD = {
+	radius: 0,
+	segmentCount: 0,
+	ringCount: 0,
+	numCps: 0,
+	stiffness: 0,
+	shader: '',
+
+	WIREFRAME: 'wireframe',
+	PHONG: 'phong',
+	LAMBERT: 'lambert',
+	TOON: 'toon'
+};
+
 var scene = new THREE.Scene();
 
 var camera = new THREE.PerspectiveCamera( 50, window.innerWidth/window.innerHeight, 0.1, 1000 );
@@ -9,95 +23,143 @@ scene.add( directionalLight );
 var light = new THREE.AmbientLight( 0x404040 ); // soft white light
 scene.add( light );
 
-var controls = new THREE.OrbitControls( camera );
-var basicMat = new THREE.MeshBasicMaterial( { color: "#433F81" } );
-basicMat.wireframe = true;
-var phongMat = new THREE.MeshPhongMaterial( { color: "#F33F81" } );
+// var controls = new THREE.OrbitControls( camera );
+var bodyMat;
 
-var renderer = new THREE.WebGLRenderer({antialias:true});
+var wireframeMat = new THREE.MeshBasicMaterial( { color: "#433F81" } );
+wireframeMat.wireframe = true;
+
+var phongMat = new THREE.MeshPhongMaterial( { color: "#F33F81" } );
+phongMat.side = THREE.DoubleSide;
+
+var lambertMat = new THREE.MeshLambertMaterial( { color: "#AABBCC" } );
+lambertMat.side = THREE.DoubleSide;
+
+var toonMat;
+var loader = new THREE.TextureLoader();
+loader.load(
+	'textures/toonramp2.png',
+	function ( texture ) {
+		texture.magFilter = THREE.NearestFilter;
+		texture.minFilter = THREE.NearestFilter;
+		toonMat = new THREE.MeshToonMaterial( { color: "#FFFFFF" , gradientMap: texture} );
+		toonMat.side = THREE.DoubleSide;
+		toonMat.shininess = 0;
+	},
+	undefined,
+	function ( err ) {
+		console.error( 'An error happened loading toonramp.' );
+	}
+);
+
+var webGLCanvas = document.getElementById("webGLCanvas");
+var renderer = new THREE.WebGLRenderer({ antialias: true, canvas: webGLCanvas });
 renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
-document.body.appendChild( renderer.domElement );
 
 var mousePos = new THREE.Vector3(0,0,0);
 document.onmousemove = function(e){
-    mousePos.x = e.pageX / window.innerWidth;
-    mousePos.y = e.pageY / window.innerHeight;
+    mousePos.x = e.clientX / window.innerWidth;
+    mousePos.y = e.clientY / window.innerHeight;
 }
 
 
 var world = new CANNON.World();
-world.gravity.set(0, 0, 0); // m/s²
+world.gravity.set(0, 0, 0); 
 world.broadphase = new CANNON.NaiveBroadphase();
-world.solver.iterations = 50;
+world.solver.iterations = 10;
 
+function initBod(xOffset, radius, segmentCount, ringCount, numCps, stiffness, shader) {
+	HAMBOD.radius = radius;
+	HAMBOD.segmentCount = segmentCount;
+	HAMBOD.ringCount = ringCount;
+	HAMBOD.numCps = numCps;
+	HAMBOD.stiffness = stiffness;
+	HAMBOD.bodyMat = getShader(shader);
+	HAMBOD.xOffset = xOffset;
 
-
-var radius = .2;
-var segmentCount = 5;
-var ringCount = 5;
-var numCps = 15;
-
-var points = [];
-for(var i = 0; i < numCps; i++) {
-	var offset = -i*2;
-	points.push(new THREE.Vector3(0,0,offset));
+	createBod();
+	simloop();
 }
 
-var sphereMeshes = [];
-var sphereBodies = [];
-var springs = [];
+
 var mouseBody;
 var mouseZ;
-var r = .3;
-for(var i = 0; i < points.length; i++) {
-	var newMesh = new THREE.Mesh( new THREE.SphereBufferGeometry( r, 20, 10 ), basicMat );
-	newMesh.position.copy(points[i]);
-	// scene.add( newMesh );
-	sphereMeshes.push(newMesh);
+var bodyMesh, meshBuilder;
+var sphereMeshes, sphereBodies, springs;
 
-	var sphereBody = new CANNON.Body({
-		mass: 1, // kg
-		position: CANNONVec(points[i]), // m
-		shape: new CANNON.Sphere(r),
-		linearDamping: .5
-	});
-
-	if(i == 0) {
-		sphereBody.type = CANNON.Body.STATIC;
-		sphereBody.position = CANNONVec(camera.position);
-		sphereBody.position.y -= 2;
-		sphereBody.position.z += 1;
-	} else {
-		var spring = new CANNON.Spring(sphereBodies[sphereBodies.length-1], sphereBody,{
-            localAnchorA: new CANNON.Vec3(0,0,0),
-            localAnchorB: new CANNON.Vec3(0,0,0),
-            restLength : 1,
-            stiffness : 20,
-            damping : 1,
-        });
-        springs.push(spring);
+function createBod() {
+	var points = [];
+	for(var i = 0; i < HAMBOD.numCps; i++) {
+		var offset = -i*2;
+		points.push(new THREE.Vector3(0,0,offset));
 	}
 
-	if(i == points.length-1) {
-		mouseBody = sphereBody;
-		mouseBody.type = CANNON.Body.STATIC;
+	// clean up old bod
+	if(bodyMesh) {
+		for(var i = 0; i < sphereBodies.length; i++) {
+			world.removeBody(sphereBodies[i]);
+		}
 
-		mouseZ = new THREE.Vector3().copy(points[i]).project(camera).z
+		scene.remove(bodyMesh);
+		meshBuilder.dispose();
 	}
 
-	world.addBody(sphereBody);
-	sphereBodies.push(sphereBody);
+	sphereMeshes = [];
+	sphereBodies = [];
+	springs = [];
+
+	var r = .3;
+	for(var i = 0; i < points.length; i++) {
+		var newMesh = new THREE.Mesh( new THREE.SphereBufferGeometry( r, 20, 10 ), wireframeMat );
+		newMesh.position.copy(points[i]);
+		// scene.add( newMesh );
+		sphereMeshes.push(newMesh);
+
+		var sphereBody = new CANNON.Body({
+			mass: 1, // kg
+			position: CANNONVec(points[i]), // m
+			shape: new CANNON.Sphere(r),
+			linearDamping: .5
+		});
+
+		if(i == 0) {
+			sphereBody.type = CANNON.Body.STATIC;
+			sphereBody.position = CANNONVec(camera.position);
+			sphereBody.position.x += HAMBOD.xOffset;
+			sphereBody.position.y -= 2;
+			sphereBody.position.z += 1;
+		} else {
+			var spring = new CANNON.Spring(sphereBodies[sphereBodies.length-1], sphereBody,{
+	            localAnchorA: new CANNON.Vec3(0,0,0),
+	            localAnchorB: new CANNON.Vec3(0,0,0),
+	            restLength : 0,
+	            stiffness : HAMBOD.stiffness,
+	            damping : 1,
+	        });
+	        springs.push(spring);
+		}
+
+		if(i == points.length-1) {
+			mouseBody = sphereBody;
+			mouseBody.type = CANNON.Body.STATIC;
+
+			mouseZ = new THREE.Vector3().copy(points[i]).project(camera).z
+		}
+
+		world.addBody(sphereBody);
+		sphereBodies.push(sphereBody);
+	}
+
+
+	meshBuilder = new MeshBuilder(points.length, HAMBOD.ringCount, HAMBOD.segmentCount, HAMBOD.radius);
+	meshBuilder.updateGeometry(sphereMeshes);
+
+	bodyMesh = new THREE.Mesh( meshBuilder.geometry, HAMBOD.bodyMat );
+	scene.add( bodyMesh );
 }
 
 
-var meshBuilder = new MeshBuilder(points.length, ringCount, segmentCount, radius);
-meshBuilder.updateGeometry(sphereMeshes);
-
-var cube = new THREE.Mesh( meshBuilder.geometry, basicMat );
-
-// Add cube to Scene
-scene.add( cube );
 
 function syncMeshWithBody(mesh, body) {
 	mesh.position.x = body.position.x;
@@ -129,7 +191,7 @@ var fixedTimeStep = 1.0 / 60.0; // seconds
 var maxSubSteps = 3;
 var lastTime;
 
-(function simloop(time) {
+function simloop(time) {
 	requestAnimationFrame(simloop);
 	if(lastTime !== undefined) {
 		var dt = (time - lastTime) / 1000;
@@ -143,12 +205,55 @@ var lastTime;
 	syncModelPositions();
 	meshBuilder.updateGeometry(sphereMeshes);
 
-	controls.update();
+	// controls.update();
 	renderer.render(scene, camera);
-})();
+}
 
 world.addEventListener("postStep",function(event){
 	for(var i = 0; i < springs.length; i++) {
     	springs[i].applyForce();
 	}
 });
+
+function setSpringStiffness(val) {
+	HAMBOD.stiffness = val;
+	for(var i = 0; i < springs.length; i++) {
+		springs[i].stiffness = val;
+	}
+}
+
+function setNumCPS(val) {
+	HAMBOD.numCps = val;
+	createBod();
+}
+
+function setSegmentCount(val) {
+	HAMBOD.segmentCount = val;
+	createBod();
+}
+
+function setRadius(val) {
+	HAMBOD.radius = val;
+	createBod();	
+}
+
+function getShader(shaderName) {
+	switch(shaderName) {
+	case HAMBOD.WIREFRAME:
+		return wireframeMat;
+	case HAMBOD.PHONG:
+		return phongMat;
+	case HAMBOD.TOON:
+		return toonMat;
+	case HAMBOD.LAMBERT:
+		return lambertMat;
+	default:
+		console.log("Unknown shader: " + shaderName);
+		return null;
+	}
+}
+
+function setShader(val) {
+	HAMBOD.bodyMat = getShader(val);
+	bodyMesh.material = HAMBOD.bodyMat;
+}

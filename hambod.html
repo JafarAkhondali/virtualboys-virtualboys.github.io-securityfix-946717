@@ -1,15 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>Emmanuel Momot</title>
-		<meta charset="utf-8">
+		<meta charset="ISO-8859-1">
+	    <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+	    <meta name="description" content="Manny Momot makes video games.">
+	    <meta name=”robots” content=”noodp”>
+		<meta name="keywords" content="Manny, Momot, Emmanuel, video games, virtual buddies">
+		<meta name="author" content="Manny Momot">
+
+		<link rel="stylesheet" href="style.css">
+		<link id="favicon" rel="shortcut icon" href="images/favicon.ico" />
+
+		<title>WIGGLE</title>
 	</head>
 	<body>
-		<script src="newTHREE/three.min.js"></script>
-		<script src="cannon.min.js"></script>
-		<script src="mrdoob/examples/js/controls/OrbitControls.js"></script>
-		<script src="utils.js"></script>
-		<script src="procmesh.js"></script>
-		<script src="hambod.js"></script>
+		<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
+		<div id="controlPanel" class="control-panel">
+			<h2>
+				Control Panel
+			</h2>
+			<table>
+				<tr>
+					<td>
+						<label for="springSlider">Tension: <text id="springVal">50</text></label>
+					</td>
+					<td>
+						<input type="range" min="1" max="200" value="20" class="slider" id="springSlider" oninput="setSpringStiffness(this.value);">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="cpSlider">Length: <text id="cpVal">50</text></label>
+					</td>
+					<td>
+						<input type="range" min="3" max="100" value="20" class="slider" id="cpSlider" oninput="setNumCPS(this.value);">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="segmentSlider">Segment Count: <text id="segmentVal">50</text></label>
+					</td>
+					<td>
+						<input type="range" min="3" max="20" value="5" class="slider" id="segmentSlider" oninput="setSegmentCount(this.value);">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="radiusSlider">Radius: <text id="radiusVal">50</text></label>
+					</td>
+					<td>
+						<input type="range" min=".1" max="5" value="1" step=".1" class="slider" id="radiusSlider" oninput="setRadius(this.value);">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<label for="shaderSelect">Shader: </label>
+					</td>
+					<td>
+						<select id="shaderSelect" onchange="setShader(this.value);">
+							<option value="wireframe">Wireframe</option>
+							<option value="phong">Phong</option>
+							<option value="lambert">Lambert</option>
+							<option value="toon">Toon</option>
+						</select>
+					</td>
+				</tr>
+			</table>
+		</div>
 	</body>
+
+	<script src="newTHREE/three.min.js"></script>
+	<script src="cannon.min.js"></script>
+	<script src="utils.js"></script>
+	<script src="procmesh.js"></script>
+	<script src="hambod.js"></script>
+
+	<script type="text/javascript">
+		var vals = [];
+		vals.push(document.getElementById("springVal"));
+		vals.push(document.getElementById("cpVal"));
+		vals.push(document.getElementById("segmentVal"));
+		vals.push(document.getElementById("radiusVal"));
+
+		var sliders = [];
+		sliders.push(document.getElementById("springSlider"));
+		sliders.push(document.getElementById("cpSlider"));
+		sliders.push(document.getElementById("segmentSlider"));
+		sliders.push(document.getElementById("radiusSlider"));
+
+		initBod(0,10,10,10,10,10, HAMBOD.WIREFRAME);
+
+		for(var i = 0; i < vals.length; i++) {
+			var slider = sliders[i];
+			var val = vals[i];
+			slider.val = val;
+			slider.addEventListener("input", function(e) { 
+				this.val.innerHTML = this.value; 
+			});
+
+			val.innerHTML = slider.value;
+			slider.oninput();
+		}
+
+	</script>
+
 </html>

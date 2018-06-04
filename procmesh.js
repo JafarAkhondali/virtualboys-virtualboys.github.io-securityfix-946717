@@ -1,3 +1,7 @@
+function disposeArray() {
+
+}
+
 function MeshBuilder(numPoints, ringCount, segmentCount, radius) {
 	var self = this;
 
@@ -36,11 +40,13 @@ function MeshBuilder(numPoints, ringCount, segmentCount, radius) {
 
 		var vertAttr = new THREE.Float32BufferAttribute(vertexBuffer, 3);
 		vertAttr.dynamic = true;
-		self.geometry.addAttribute('position',  vertAttr);	
+		vertAttr.onUploadCallback = disposeArray;
+		self.geometry.addAttribute('position',  vertAttr);
 
 		var normalAttr = new THREE.Float32BufferAttribute(normalBuffer, 3);
 		normalAttr.dynamic = true;
-		self.geometry.addAttribute('normal',  normalAttr);	
+		normalAttr.onUploadCallback = disposeArray;
+		self.geometry.addAttribute('normal',  normalAttr);
 	}
 
 	function updateRing(center, positions, normals, baseIndex, rot) {
@@ -87,15 +93,6 @@ function MeshBuilder(numPoints, ringCount, segmentCount, radius) {
 			updateRing(ps[i], positions, normals, baseIndex, rot);
 
 		}
-
-		// for(var cp = 0; cp < cps.length-1; cp++) {
-		// 	for(var ring = 0; ring < ringCount; ring++) {
-		// 		var baseIndex = (cp * ringCount + ring) * (segmentCount + 1) * 3;
-		// 		updateRing(cps[cp].position, positions, normals, baseIndex);
-		// 	}
-		// }
-
-		// updateRing(cps[cps.length-1].position, positions, normals, cp * ringCount * (segmentCount + 1) * 3);
 
 		self.geometry.attributes.position.needsUpdate = true;
 		self.geometry.attributes.normal.needsUpdate = true;
@@ -189,6 +186,10 @@ function MeshBuilder(numPoints, ringCount, segmentCount, radius) {
 			m.multiplyScalar(.5);
 		}
 		return m;
+	}
+
+	self.dispose = function() {
+		self.geometry.dispose();
 	}
 
 	initGeometry();

@@ -5,7 +5,7 @@
 }
 
 
- html,div,canvas { margin: 0; padding: 0; width: 100%; -webkit-font-smoothing : none; font-smooth: never;background-color: rgb(153, 153, 102);color:black;}
+ html,div,canvas { margin: 0; padding: 0; width: 100%; -webkit-font-smoothing : none; font-smooth: never;color:white;}
  ::-moz-selection { color: #333; text-shadow: none; }
  ::selection {  color: #333; text-shadow: none; }
  .clear:after { visibility: hidden; display: block; font-size: 0; content: " "; clear: both; height: 0; }
@@ -36,6 +36,11 @@ img {
 }
 .game-content {
   width:50%;
+}
+.control-panel {
+  width:auto;
+  float:right;
+  background-color: grey;
 }
 
 .wiz-mud {

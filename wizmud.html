@@ -15,11 +15,12 @@
 </head>
 
 <body>
+	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
 	<table>
 		<tr>
 			<td valign="top">
 				<div class="side-bar" style="padding-left:20px;">
-					<h2><a href="index.html">HOME</a></h2>
+					<h2><a href="hambod.html">HOME</a></h2>
 					<h2><a href="wizmud.html">WIZMUD</a></h2>
 					<h2><a href="wackanol.html">W.A.O.</a></h2>
 					<h2><a href="https://virtual-buddies.tumblr.com/">OTHER</a></h2>
@@ -55,4 +56,13 @@
 		</tr>
 	</table>
 </body>
+<script src="newTHREE/three.min.js"></script>
+<script src="cannon.min.js"></script>
+<script src="utils.js"></script>
+<script src="procmesh.js"></script>
+<script src="hambod.js"></script>
+
+<script type="text/javascript">
+	initBod(.2,5,5,50,20, HAMBOD.wireframe);
+</script>
 </html>
