@@ -74,6 +74,8 @@
 	<script src="scripts/utils.js"></script>
 	<script src="scripts/procmesh.js"></script>
 	<script src="scripts/hambod.js"></script>
+	<script src="scripts/GLTFLoader.js"></script>
+	<script src="scripts/wizmud.js"></script>
 
 	<script type="text/javascript">
 		var vals = [];
@@ -88,7 +90,7 @@
 		sliders.push(document.getElementById("segmentSlider"));
 		sliders.push(document.getElementById("radiusSlider"));
 
-		initBod(0,10,10,10,10,10, HAMBOD.WIREFRAME);
+		
 
 		for(var i = 0; i < vals.length; i++) {
 			var slider = sliders[i];
@@ -99,8 +101,10 @@
 			});
 
 			val.innerHTML = slider.value;
-			slider.oninput();
 		}
+
+		initBod(0,sliders[3].value,sliders[2].value,10,sliders[1].value,sliders[0].value, HAMBOD.WIREFRAME);
+		startLoop();
 
 	</script>
 

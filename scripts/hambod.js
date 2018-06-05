@@ -6,6 +6,8 @@ var HAMBOD = {
 	numCps: 0,
 	stiffness: 0,
 	shader: '',
+	rotate: false,
+	rotateTime: 20,
 
 	WIREFRAME: 'wireframe',
 	PHONG: 'phong',
@@ -71,7 +73,7 @@ world.gravity.set(0, 0, 0);
 world.broadphase = new CANNON.NaiveBroadphase();
 world.solver.iterations = 10;
 
-function initBod(xOffset, radius, segmentCount, ringCount, numCps, stiffness, shader) {
+function initBod(xOffset, radius, segmentCount, ringCount, numCps, stiffness, shader, rotate) {
 	HAMBOD.radius = radius;
 	HAMBOD.segmentCount = segmentCount;
 	HAMBOD.ringCount = ringCount;
@@ -79,16 +81,18 @@ function initBod(xOffset, radius, segmentCount, ringCount, numCps, stiffness, sh
 	HAMBOD.stiffness = stiffness;
 	HAMBOD.bodyMat = getShader(shader);
 	HAMBOD.xOffset = xOffset;
+	HAMBOD.rotate = rotate !== undefined;
 
 	createBod();
-	simloop();
 }
 
 
 var mouseBody;
 var mouseZ;
 var bodyMesh, meshBuilder;
-var sphereMeshes, sphereBodies, springs;
+var sphereMeshes = [];
+var sphereBodies = [];
+var springs = [];
 
 function createBod() {
 	var points = [];
@@ -106,10 +110,6 @@ function createBod() {
 		scene.remove(bodyMesh);
 		meshBuilder.dispose();
 	}
-
-	sphereMeshes = [];
-	sphereBodies = [];
-	springs = [];
 
 	var r = .3;
 	for(var i = 0; i < points.length; i++) {
@@ -161,7 +161,10 @@ function createBod() {
 	scene.add( bodyMesh );
 }
 
-
+function rotateBody() {
+	var theta = totalTime * 2 * Math.PI / HAMBOD.rotateTime;
+	sphereBodies[0].position = new CANNON.Vec3(HAMBOD.xOffset * Math.cos(theta), HAMBOD.xOffset * Math.sin(theta), sphereBodies[0].position.z);
+}
 
 function syncMeshWithBody(mesh, body) {
 	mesh.position.x = body.position.x;
@@ -194,8 +197,8 @@ var maxSubSteps = 3;
 var lastTime;
 var dt = 0, totalTime;
 
-function simloop(time) {
-	requestAnimationFrame(simloop);
+function startLoop(time) {
+	requestAnimationFrame(startLoop);
 	if(lastTime !== undefined) {
 		dt = (time - lastTime) / 1000;
 		world.step(fixedTimeStep, dt, maxSubSteps);
@@ -204,10 +207,19 @@ function simloop(time) {
 	lastTime = time;
 	totalTime = time / 1000;
 
-	updateMouseBody();
+	if(mouseBody) {
+		updateMouseBody();
+	}
 
 	syncModelPositions();
-	meshBuilder.updateGeometry(sphereMeshes);
+
+	if(meshBuilder) {
+		if(HAMBOD.rotate) {
+			rotateBody();
+		}
+
+		meshBuilder.updateGeometry(sphereMeshes);
+	}
 
 	for(var i = 0; i < updateList.length; i++) {
 		updateList[i].update();

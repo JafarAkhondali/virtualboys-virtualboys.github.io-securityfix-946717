@@ -20,42 +20,49 @@
 		<tr>
 			<td valign="top" class="tdsidebar">
 				<div class="side-bar" style="margin-left:20px;">
-				<img src="images/facekscope.gif" alt="My Face." class="face" style="border-radius: 50%; width:160px;">
-					<h2><a href="index.html">HOME</a></h2>
-					<h2><a href="wizmud.html">WIZMUD</a></h2>
-					<h2><a href="wackanol.html">W.A.O.</a></h2>
-					<h2><a href="https://virtual-buddies.tumblr.com/">OTHER</a></h2>
+				<h2><a href="index.html">
+					<img src="images/facekscope.gif" alt="My Face." class="face" style="border-radius: 50%; width:50%;"></a>
+				</h2>
+				<h2><a href="wizmud.html">WizMUD</a></h2>
+				<h2><a href="wackanol.html">Wack an Ol'</a></h2>
+				<h2><a href="https://virtual-buddies.tumblr.com/">Other</a></h2>
+				<h2><a href="mailto:emanmomot@gmail.com">Email</a></h2>
 				</div>
 			</td>
 			<td valign="top" class="tdcontent">	
 				<div class="game-content">
 					<img src="images/wiztitle.gif" alt="wizmud." >
-
 					<h2>
 					<br><br>
 					An abandoned MUD (Multi User Dimension), unearthed by hackers in the year 2017 where you play as a wizard in a once lively MMO world. The new tenants of WizMud have taken to tossing priceless artifacts (old junk) from this forgotten MMO into the fishing pond, along with its conventions.
 					<br><br>
-					<a href="http://wiz.zone">Play Online.</a>
-					<br>
-					<a href="https://twitter.com/wiz_mud">Twitter.</a>
+					<table style="border-collapse: collapse; width:100%; text-align: center;">
+						<tr>
+							<td style="width:50%">
+								<a href="http://wiz.zone" target="_blank">Play Online.</a>
+							</td>
+							<td style="width:50%">
+								<a href="https://twitter.com/wiz_mud" target="_blank">Twitter.</a>
+							</td>
+						</tr>
+					</table>
 					<br><br>
 					</h2>
 					<h3>
-					WizMUD was started as a school project by myself, Tyler Cauthen, and David Califf in early 2017. Since then we have grown to over 500 monthly users. I developed the network code, database, game logic, and performed server maintenence. Development continues...<br><br>
+					WizMUD was started as a school project by myself, Tyler Cauthen, and David Califf in early 2017. Since then we have grown to over 500 monthly users. I developed the network code, database, game logic, and performed server maintenence. It is made in Unity3D, targeting WebGL, playable in the browser. Development continues...<br><br>
 					</h3>
 					<img src="images/zoomthru.gif" alt="Zoom through WizMUD"><br>
 					<img src="images/gameplay.gif" alt="Gameplay"><br>
 					<img src="images/hWeen.gif" alt="Halloween Update"><br><br>
 
 					<h2>
-					Credits:<br>
-					<div style="font-size:20px;">
+						Credits:<br>
+					</h2>
+					<h3>
 						Programming: Emmanuel Momot, David Califf<br>
 						Art: Tyler Cauthen<br>
 						Sound Design: Tristan Whitehill
-					</div>
-
-					</h2>
+					</h3>
 				</div>
 			</td>
 		</tr>
@@ -72,6 +79,7 @@
 <script src="scripts/wizmud.js"></script>
 
 <script type="text/javascript">
-	initBod(5,.2,5,5,50,50, HAMBOD.WIREFRAME);
+	// initBod(5,.2,5,5,50,50, HAMBOD.WIREFRAME);
+	startLoop();
 </script>
 </html>

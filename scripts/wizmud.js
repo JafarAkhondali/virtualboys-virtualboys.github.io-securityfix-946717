@@ -58,12 +58,12 @@ function Star(ttl) {
 	var geometry = new THREE.BoxGeometry( 1, 1, 1 );
 	var cube = new THREE.Mesh( geometry, basicWhiteMat );
 	scene.add(cube);
-	cube.scale.multiplyScalar(.05);
+	cube.scale.multiplyScalar(.07);
+	cube.scale.z = .001;
 	cube.position.set(Math.random()-.5, Math.random()-.5, 0);
-	cube.position.multiplyScalar(20);
+	cube.position.multiplyScalar(30);
 	cube.position.z = -10;
 	
-	console.log("making star at " + cube.position.x);
 
 	self.update = function() {
 		ttl -= dt;
@@ -71,7 +71,6 @@ function Star(ttl) {
 			scene.remove(cube);
 			geometry.dispose();
 			destroyList.push(self);
-			console.log("destroying star at " + cube.position.x);
 		} else {
 			cube.scale.add(new THREE.Vector3(sizeInc, sizeInc, 0));
 		}

@@ -16,42 +16,45 @@
 
 <body>
 	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
-	<table>
-		<tr>
-			<td valign="top" class="td-sidebar">
-				<div class="side-bar" style="padding-left:20px;">
-				<img src="images/facekscope.gif" alt="My Face." style="border-radius: 50%; width:50%;display:block">
-					<h2><a href="index.html">HOME</a></h2>
-					<h2><a href="wizmud.html">WIZMUD</a></h2>
-					<h2><a href="wackanol.html">W.A.O.</a></h2>
-					<h2><a href="https://virtual-buddies.tumblr.com/">OTHER</a></h2>
-				</div>
-			</td>
-			<td valign="top" style="padding-left:40px">	
-				<div class="game-content">
-					<h1>
-					Emmanuel Momot
-					</h1>
+	<div style="width:50%; text-align:center;left: 25%; position:fixed; bottom: 30px;">
+		<h1>
+		Emmanuel Momot
+		</h1>
 
-					<h2 style="font-size:23px;font-family:Helvetica;font-weight:lighter;text-align: justify;""> 
-						I make video games, usually with Tyler Cauthen, David Califf, &amp; Tristan Whitehill. Responsible for all things code-related.
-						Unity dev.
-						<br><br>
-						emanmomot@gmail.com
-					</h2>
-					<br><br><br>
-				</div>
-			</td>
-		</tr>
-	</table>
+		<h2 style="font-size:23px;font-family:Helvetica;font-weight:lighter;text-align: justify;""> 
+			I make video games &amp 3D experiences, usually with Tyler Cauthen, David Califf, &amp; Tristan Whitehill. Responsible for all things code-related.
+			Unity dev.
+			<br><br>
+			<table style="border-collapse: collapse; width:100%; text-align: center;">
+				<tr>
+					<td style="width:25%">
+						<a href="wizmud.html">WizMUD</a>
+					</td>	
+					<td style="width:25%">
+						<a href="wackanol.html">Wack an Ol'</a>
+					</td>
+					<td style="width:25%">
+						<a href="https://virtual-buddies.tumblr.com/">Other</a>
+					</td>
+					<td style="width:25%">
+						<a href="mailto:emanmomot@gmail.com">Email</a>
+					</td>
+				</tr>
+			</table>
+		</h2>
+		<br><br><br>
+	</div>
 </body>
-	<script src="newTHREE/three.min.js"></script>
-	<script src="cannon.min.js"></script>
-	<script src="utils.js"></script>
-	<script src="procmesh.js"></script>
-	<script src="hambod.js"></script>
+	<script src="scripts/newTHREE/three.min.js"></script>
+	<script src="scripts/cannon.min.js"></script>
+	<script src="scripts/utils.js"></script>
+	<script src="scripts/procmesh.js"></script>
+	<script src="scripts/hambod.js"></script>
+	<script src="scripts/GLTFLoader.js"></script>
+	<script src="scripts/wizmud.js"></script>
 
 	<script type="text/javascript">
-		initBod(5,1,5,5,10,20, HAMBOD.WIREFRAME);
+		initBod(10,.2,5,5,50,50, HAMBOD.WIREFRAME);
+		startLoop();
 	</script>
 </html>
