@@ -15,6 +15,7 @@
  body {
   font-family: Arial;
   font-size: 20;
+  margin-top: 20px;
  }
 
 h1 {
@@ -25,17 +26,50 @@ h1 {
 
 h2 {
   font-family: Helvetica;
-  font-size: 40;
+  font-size: 25px;
+  font-weight:lighter;
+  text-align: justify;
+}
+
+h3 {
+  font-family: Helvetica;
+  font-size: 35;
+  font-weight:lighter;
+  text-align: justify;
+}
+
+.face {
+  z-index: -2;
+}
+
+.tdsidebar {
+  width: 200px;
+   position: fixed;
+}
+
+.tdcontent {
+  padding-left: 200px;
+}
+
+a:link {
+    color: #8E44AD;
+}
+
+a:visited {
+    color: #5B2C6F;
 }
 
 img {
   width:100%;
 }
+table {
+   border-collapse: collapse;
+}
 .side-bar {
-  width:40%;
 }
 .game-content {
   width:50%;
+  text-align: left;
 }
 .control-panel {
   width:auto;

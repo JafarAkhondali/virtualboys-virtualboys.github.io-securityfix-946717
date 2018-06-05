@@ -18,31 +18,36 @@
 	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
 	<table>
 		<tr>
-			<td valign="top">
-				<div class="side-bar" style="padding-left:20px;">
-					<h2><a href="hambod.html">HOME</a></h2>
+			<td valign="top" class="tdsidebar">
+				<div class="side-bar" style="margin-left:20px;">
+				<img src="images/facekscope.gif" alt="My Face." class="face" style="border-radius: 50%; width:160px;">
+					<h2><a href="index.html">HOME</a></h2>
 					<h2><a href="wizmud.html">WIZMUD</a></h2>
 					<h2><a href="wackanol.html">W.A.O.</a></h2>
 					<h2><a href="https://virtual-buddies.tumblr.com/">OTHER</a></h2>
 				</div>
 			</td>
-			<td valign="top" style="padding-left:40px">	
+			<td valign="top" class="tdcontent">	
 				<div class="game-content">
-					<h1 class="wiz-mud" style="font-size:80px; text-align:center;">
-						WizMUD
-					</h1>
+					<img src="images/wiztitle.gif" alt="wizmud." >
 
-					<h2 style="font-size:23px;font-family:Helvetica;font-weight:lighter;text-align: justify;">
+					<h2>
+					<br><br>
 					An abandoned MUD (Multi User Dimension), unearthed by hackers in the year 2017 where you play as a wizard in a once lively MMO world. The new tenants of WizMud have taken to tossing priceless artifacts (old junk) from this forgotten MMO into the fishing pond, along with its conventions.
 					<br><br>
 					<a href="http://wiz.zone">Play Online.</a>
 					<br>
 					<a href="https://twitter.com/wiz_mud">Twitter.</a>
 					<br><br>
+					</h2>
+					<h3>
+					WizMUD was started as a school project by myself, Tyler Cauthen, and David Califf in early 2017. Since then we have grown to over 500 monthly users. I developed the network code, database, game logic, and performed server maintenence. Development continues...<br><br>
+					</h3>
 					<img src="images/zoomthru.gif" alt="Zoom through WizMUD"><br>
 					<img src="images/gameplay.gif" alt="Gameplay"><br>
 					<img src="images/hWeen.gif" alt="Halloween Update"><br><br>
 
+					<h2>
 					Credits:<br>
 					<div style="font-size:20px;">
 						Programming: Emmanuel Momot, David Califf<br>
@@ -56,13 +61,17 @@
 		</tr>
 	</table>
 </body>
-<script src="newTHREE/three.min.js"></script>
-<script src="cannon.min.js"></script>
-<script src="utils.js"></script>
-<script src="procmesh.js"></script>
-<script src="hambod.js"></script>
+<script src="scripts/newTHREE/three.min.js"></script>
+<script src="scripts/cannon.min.js"></script>
+<script src="scripts/OrbitControls.js"></script>
+<script src="scripts/utils.js"></script>
+<script src="scripts/procmesh.js"></script>
+<!-- <script src="scripts/simplescene.js"></script> -->
+<script src="scripts/hambod.js"></script>
+<script src="scripts/GLTFLoader.js"></script>
+<script src="scripts/wizmud.js"></script>
 
 <script type="text/javascript">
-	initBod(.2,5,5,50,20, HAMBOD.wireframe);
+	initBod(5,.2,5,5,50,50, HAMBOD.WIREFRAME);
 </script>
 </html>
