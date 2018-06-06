@@ -111,6 +111,10 @@ function createBod() {
 		meshBuilder.dispose();
 	}
 
+	sphereMeshes = [];
+	sphereBodies = [];
+	springs = [];
+
 	var r = .3;
 	for(var i = 0; i < points.length; i++) {
 		var newMesh = new THREE.Mesh( new THREE.SphereBufferGeometry( r, 20, 10 ), wireframeMat );
