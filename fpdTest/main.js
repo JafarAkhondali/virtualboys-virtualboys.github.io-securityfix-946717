@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136';
 
 import {FirstPersonControls} from 'https://cdn.skypack.dev/three@0.136/examples/jsm/controls/FirstPersonControls.js';
-
+import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
 
 const KEYS = {
   'a': 65,
@@ -368,6 +368,20 @@ class FirstPersonCameraDemo {
     this.sprite_.position.set(0, 0, -10);
 
     this.uiScene_.add(this.sprite_);
+
+    const modelLoader = new GLTFLoader();
+
+    var modScene = this.scene_;
+    modelLoader.load( 'resources/Violin.glb', function ( gltf ) {
+
+      modScene.add( gltf.scene );
+
+    }, undefined, function ( error ) {
+
+      console.error( error );
+
+    } );
+
   }
 
   initializeLights_() {
