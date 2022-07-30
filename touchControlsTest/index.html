@@ -16,6 +16,17 @@
         <h3>TouchControls Test : </h3>
         <div id="container3d"></div>
     </div>
+    <button id="goFS">Go fullscreen</button>
+    <script>
+    var goFS = document.getElementById('goFS');
+    goFS.addEventListener(
+        'click',
+        function () {
+            document.getElementById('container3d').requestFullscreen();
+        },
+        false,
+    );
+    </script>
 
     <!-- Import maps polyfill -->
     <!-- Remove this when import maps will be widely supported -->
