@@ -1,24 +1,39 @@
+
+// import * as THREE from 'three';
+// import { GLTFLoader } from './libs/threejs/GLTFLoader.js';
+
 var width, height;
 var viewAngle = 45,
 	near = 1,
 	far = 10000;
 var aspect;
 
-var renderer, camera, scene, controls;
+var renderer, camera, scene, controls, clock;
 var sceneObject, intersected;
 
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+let canJump = false;
+
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+
+const playerHeight = .3;
+const playerSpeed = 50;
+const jumpSpeed = 10;
+const gravity = 20;
+const deceleration = 10;
 
 $(function () {
 
 	if (!Detector.webgl) Detector.addGetWebGLMessage();
 
-	var container = $("#container3d");
+	var container = $("#container_3d");
 	startScene(container);
 	
 });
-
-
-
 
 function startScene(container) {
 
@@ -27,25 +42,19 @@ function startScene(container) {
 	aspect = width / height;
 
 	scene = new THREE.Scene();
+	clock = new THREE.Clock();
 
-	// Load models
-	var loader = new THREE.ObjectLoader();
+	const loader = new THREE.GLTFLoader().setPath( 'model/' );
+	loader.load( 'scene.gltf', function ( gltf ) {
 
-	loader.load("model/model.json", function (object) {
-		sceneObject = object;
-		// console.log(sceneObject);
-		sceneObject.scale.set(13, 13, 13);
-		sceneObject.position.set(0, 0, 0);
-		scene.add(sceneObject);
-
-		var axes = new THREE.AxisHelper(700);
-		scene.add(axes);
-
+		scene.add( gltf.scene );
+		camera = gltf.cameras[0];
 		addLights();
+		onWindowResize();
 		addControls();
-
 		animate();
-	});
+
+	} );
 
 	function addLights() {
 		// Lights
@@ -67,19 +76,29 @@ function startScene(container) {
 	function addControls() {
 		// Camera
 		camera = new THREE.PerspectiveCamera(viewAngle, aspect, near, far);
+		camera.position.set(0, .3, -5);
+		camera.lookAt(new THREE.Vector3(0, .3, 0));
 		// Controls
 		var options = {
-			speedFactor: 0.5,
+			speedFactor: 0.04,
 			delta: 1,
 			rotationFactor: 0.002,
 			maxPitch: 55,
 			hitTest: true,
 			hitTestDistance: 40
 		};
-		controls = new TouchControls(container.parent(), camera, options);
-		controls.setPosition(0, 35, 400);
-		controls.addToScene(scene);
-		// controls.setRotation(0.15, -0.15);
+
+		controls = new THREE.FPSMultiplatformControls( camera, document.body );
+
+		scene.add( controls.getObject() );
+
+		document.body.addEventListener( 'click', function () {
+			if(controls.pointerLock.isLocked) {
+				controls.pointerLock.unlock();
+			} else {
+				controls.pointerLock.lock();
+			}
+		} );
 	}
 
 	renderer = new THREE.WebGLRenderer();
@@ -88,42 +107,23 @@ function startScene(container) {
 
 	$(window).on("resize", onWindowResize);
 
-	$(document.body).on("touchmove", function (event) {
-		event.preventDefault();
-		event.stopPropagation();
-	});
-
-
+	// $(document.body).on("touchmove", function (event) {
+	// 	event.preventDefault();
+	// 	event.stopPropagation();
+	// });
 }
 
 function animate() {
 
 	requestAnimationFrame(animate);
 
-	controls.update();
+	if(controls) {
 
-	// Mouse hit-testing:
-	var vector = new THREE.Vector3(controls.mouse.x, controls.mouse.y, 1);
-	vector.unproject(camera);
-
-	var raycaster = new THREE.Raycaster(controls.fpsBody.position, vector.sub(controls.fpsBody.position).normalize());
-
-	var intersects = raycaster.intersectObjects(sceneObject.children);
-	if (intersects.length > 0) {
-		if (intersected != intersects[0].object) {
-			if (intersected) intersected.material.emissive.setHex(intersected.currentHex);
-			intersected = intersects[0].object;
-			// console.log(intersects);
-			intersected.currentHex = intersected.material.emissive.getHex();
-			intersected.material.emissive.setHex(0xdd0090);
-		}
-	} else {
-		if (intersected) intersected.material.emissive.setHex(intersected.currentHex);
-		intersected = null;
+		const delta = clock.getDelta();
+		controls.update(delta);
 	}
 
 	renderer.render(scene, camera);
-	window.scrollTo(0, 200);
 }
 
 function onWindowResize() {
@@ -138,18 +138,31 @@ function onWindowResize() {
 }
 
 /* Get the element you want displayed in fullscreen mode (a video in this example): */
-var elem = document.getElementById("container");
+// var elem = document.getElementById("container");
 
-/* When the openFullscreen() function is executed, open the video in fullscreen.
-Note that we must include prefixes for different browsers, as they don't support the requestFullscreen method yet */
-function openFullscreen() {
-	if (elem.requestFullscreen) {
-		elem.requestFullscreen();
-	} else if (elem.webkitRequestFullscreen) { /* Safari */
-		elem.webkitRequestFullscreen();
-	} else if (elem.msRequestFullscreen) { /* IE11 */
-		elem.msRequestFullscreen();
+function toggleFullScreen() {
+	var doc = window.document;
+	var docEl = doc.documentElement;
+  
+	var requestFullScreen =
+	  docEl.requestFullscreen ||
+	  docEl.mozRequestFullScreen ||
+	  docEl.webkitRequestFullScreen ||
+	  docEl.msRequestFullscreen;
+	var cancelFullScreen =
+	  doc.exitFullscreen ||
+	  doc.mozCancelFullScreen ||
+	  doc.webkitExitFullscreen ||
+	  doc.msExitFullscreen;
+  
+	if (
+	  !doc.fullscreenElement &&
+	  !doc.mozFullScreenElement &&
+	  !doc.webkitFullscreenElement &&
+	  !doc.msFullscreenElement
+	) {
+	  requestFullScreen.call(docEl);
+	} else {
+	  cancelFullScreen.call(doc);
 	}
-	document.getElementById("fullScreenBtn").style.display="none";
-	
-}
+  }
