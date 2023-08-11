@@ -111,7 +111,7 @@ const requestAccelerometer = () => {
 			let lastXRot = 0;
 			let lastYRot = 0;
 			let didInitRot = false;
-			const rotScale = .1;
+			const rotScale = .01;
 			window.addEventListener('deviceorientation',(event) => {
 				const xRot = event.gamma;
 				const yRot = event.beta;
