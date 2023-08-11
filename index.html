@@ -7,6 +7,9 @@
     <meta name=”robots” content=”noodp”>
 	<meta name="keywords" content="Manny, Momot, Emmanuel, video games, virtual buddies">
 	<meta name="author" content="Manny Momot">
+	<meta http-equiv="ScreenOrientation" content="autoRotate:disabled">
+
+
 
 	<link rel="stylesheet" href="style.css">
 	<link id="favicon" rel="shortcut icon" href="images/favicon.ico" />
@@ -15,13 +18,16 @@
 </head>
 
 <body>
+	<div id="mobileAccelPermsOverlay" style="  position: fixed; display: none; width: 100%;height: 100%;	top: 0;left: 0;right: 0;bottom: 0;background-color: rgba(0,0,0,1);z-index: 2;">
+
+		<button id="accelPermsButton" onclick="requestAccelerometer()" style="margin: auto; height:50px;">press yes to play with the snake</button>
+
+	</div>
 	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
 	<div style="width:50%; text-align:center;left: 25%; position:fixed; bottom: 30px;">
 		<h1>
 		Emmanuel Momot
 		</h1>
-
-		<button id="accelPermsButton" onclick="requestAccelerometer()" style=" display:none; height:50px;">Get Accelerometer Permissions</button>
 
 		<h2 style="font-size:23px;font-family:Helvetica;font-weight:lighter;text-align: justify;""> 
 			I make video games &amp 3D experiences, usually with Tyler Cauthen, David Califf, &amp; Tristan Whitehill. Responsible for all things code-related.

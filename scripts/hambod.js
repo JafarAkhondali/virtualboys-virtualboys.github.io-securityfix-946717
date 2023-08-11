@@ -62,9 +62,9 @@ renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
 
 var mousePos = new THREE.Vector3(.5,.5,0);
-if(isMobile()) {
+if(!isMobile()) {
 	console.log('is mobile');
-	document.getElementById('accelPermsButton').style.display = 'block';
+	document.getElementById('mobileAccelPermsOverlay').style.display = 'grid';
 	// if (window.DeviceOrientationEvent) {
 	// 	console.log('dev orientation');
 	// 	window.addEventListener("deviceorientation", (event) => {
@@ -103,7 +103,7 @@ const onTilt = (x, y) => {
 }
 
 const requestAccelerometer = () => {
-	document.getElementById('accelPermsButton').style.display = 'none';
+	document.getElementById('mobileAccelPermsOverlay').style.display = 'none';
 	DeviceMotionEvent.requestPermission().then(response => {
 		if (response == 'granted') {
 		// Add a listener to get smartphone orientation 
