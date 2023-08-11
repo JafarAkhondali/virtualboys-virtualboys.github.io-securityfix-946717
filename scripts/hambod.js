@@ -63,20 +63,25 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 
 var mousePos = new THREE.Vector3(.5,.5,0);
 if(isMobile()) {
+	console.log('is mobile');
 	if (window.DeviceOrientationEvent) {
+		console.log('dev orientation');
 		window.addEventListener("deviceorientation", function () {
 			onTilt([event.beta, event.gamma]);
 		}, true);
 	} else if (window.DeviceMotionEvent) {
+		console.log('device motion');
 		window.addEventListener('devicemotion', function () {
 			onTilt([event.acceleration.x * 2, event.acceleration.y * 2]);
 		}, true);
 	} else {
+		console.log('moz orientation');
 		window.addEventListener("MozOrientation", function () {
 			onTilt([orientation.x * 50, orientation.y * 50]);
 		}, true);
 	}
 } else {
+	console.log('not mobile!');
 	document.onmousemove = function(e){
 		mousePos.x = e.clientX / window.innerWidth;
 		mousePos.y = e.clientY / window.innerHeight;
