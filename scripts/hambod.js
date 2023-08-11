@@ -108,16 +108,31 @@ const requestAccelerometer = () => {
 		if (response == 'granted') {
 		// Add a listener to get smartphone orientation 
 			// in the alpha-beta-gamma axes (units in degrees)
+			let lastXRot = 0;
+			let lastYRot = 0;
+			let didInitRot = false;
+			const rotScale = .1;
 			window.addEventListener('deviceorientation',(event) => {
+				const xRot = event.gamma;
+				const yRot = event.beta;
+				if(!didInitRot) {
+					lastXRot = xRot;
+					lastYRot = yRot;
+					didInitRot = true;
+				}
+				const dXRot = xRot - lastXRot;
+				const dYRot = yRot - lastYRot;
+				lastXRot = xRot;
+				lastYRot = yRot;
 				// Expose each orientation angle in a more readable way
-				rotation_degrees = event.alpha;
-				frontToBack_degrees = event.beta;
-				leftToRight_degrees = event.gamma;
+				// rotation_degrees = event.alpha;
+				// frontToBack_degrees = event.beta;
+				// leftToRight_degrees = event.gamma;
 				
-				console.log('drot: ', frontToBack_degrees, ' ', leftToRight_degrees);
-				mousePos.x += leftToRight_degrees * .1;
+				console.log('drot: ', dXRot, ' ', dYRot);
+				mousePos.x += dXRot * rotScale;
 				mousePos.x = mousePos.x.clamp(0, 1);
-				mousePos.y += frontToBack_degrees * .1;
+				mousePos.y += dYRot * rotScale;
 				mousePos.y = mousePos.y.clamp(0, 1); 
 				// Update velocity according to how tilted the phone is
 				// Since phones are narrower than they are long, double the increase to the x velocity
