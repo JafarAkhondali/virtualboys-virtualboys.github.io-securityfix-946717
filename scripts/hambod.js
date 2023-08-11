@@ -62,7 +62,7 @@ renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
 
 var mousePos = new THREE.Vector3(.5,.5,0);
-if(!isMobile()) {
+if(isMobile()) {
 	console.log('is mobile');
 	document.getElementById('mobileAccelPermsOverlay').style.display = 'grid';
 	// if (window.DeviceOrientationEvent) {
