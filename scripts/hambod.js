@@ -84,6 +84,7 @@ if(isMobile()) {
 }
 
 const onTilt = (x, y) => {
+	console.log('on tilt: ', x, y);
 	if(x && y) {
 		mousePos.x += x * .1;
 		mousePos.x = mousePos.x.clamp(0, 1);
