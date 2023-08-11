@@ -66,17 +66,20 @@ if(isMobile()) {
 	console.log('is mobile');
 	if (window.DeviceOrientationEvent) {
 		console.log('dev orientation');
-		window.addEventListener("deviceorientation", function () {
+		window.addEventListener("deviceorientation", (event) => {
+			console.log('on dev or: ' + event);
 			onTilt([event.beta, event.gamma]);
 		}, true);
 	} else if (window.DeviceMotionEvent) {
 		console.log('device motion');
-		window.addEventListener('devicemotion', function () {
+		window.addEventListener('devicemotion', (event) => {
+			console.log('on dev mot: ' + event);
 			onTilt([event.acceleration.x * 2, event.acceleration.y * 2]);
 		}, true);
 	} else {
 		console.log('moz orientation');
-		window.addEventListener("MozOrientation", function () {
+		window.addEventListener("MozOrientation", (event) => {
+			console.log('on moz or: ' + event);
 			onTilt([orientation.x * 50, orientation.y * 50]);
 		}, true);
 	}
