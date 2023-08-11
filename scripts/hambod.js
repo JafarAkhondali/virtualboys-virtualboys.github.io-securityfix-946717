@@ -61,12 +61,36 @@ var renderer = new THREE.WebGLRenderer({ antialias: false, canvas: webGLCanvas }
 renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
 
-var mousePos = new THREE.Vector3(0,0,0);
-document.onmousemove = function(e){
-    mousePos.x = e.clientX / window.innerWidth;
-    mousePos.y = e.clientY / window.innerHeight;
+var mousePos = new THREE.Vector3(.5,.5,0);
+if(isMobile()) {
+	if (window.DeviceOrientationEvent) {
+		window.addEventListener("deviceorientation", function () {
+			onTilt([event.beta, event.gamma]);
+		}, true);
+	} else if (window.DeviceMotionEvent) {
+		window.addEventListener('devicemotion', function () {
+			onTilt([event.acceleration.x * 2, event.acceleration.y * 2]);
+		}, true);
+	} else {
+		window.addEventListener("MozOrientation", function () {
+			onTilt([orientation.x * 50, orientation.y * 50]);
+		}, true);
+	}
+} else {
+	document.onmousemove = function(e){
+		mousePos.x = e.clientX / window.innerWidth;
+		mousePos.y = e.clientY / window.innerHeight;
+	}
 }
 
+const onTilt = (x, y) => {
+	if(x && y) {
+		mousePos.x += x * .1;
+		mousePos.x = mousePos.x.clamp(0, 1);
+		mousePos.y += y * .1;
+		mousePos.y = mousePos.y.clamp(0, 1); 
+	}
+}
 
 var world = new CANNON.World();
 world.gravity.set(0, 0, 0); 
@@ -210,6 +234,8 @@ function startLoop(time) {
 
 	lastTime = time;
 	totalTime = time / 1000;
+
+	onTilt(.02, .01);
 
 	if(mouseBody) {
 		updateMouseBody();
