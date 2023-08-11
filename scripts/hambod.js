@@ -235,7 +235,7 @@ function startLoop(time) {
 	lastTime = time;
 	totalTime = time / 1000;
 
-	onTilt(.02, .01);
+	// onTilt(.02, .01);
 
 	if(mouseBody) {
 		updateMouseBody();
