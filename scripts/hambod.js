@@ -63,10 +63,10 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 
 
 const requestAccelerometer = () => {
-	document.getElementById('mobileAccelPermsOverlay').style.display = 'none';
 	if(DeviceMotionEvent && DeviceMotionEvent.requestPermission) {
 		
 		DeviceMotionEvent.requestPermission().then(response => {
+			document.getElementById('mobileAccelPermsOverlay').style.display = 'none';
 			if (response == 'granted') {
 			// Add a listener to get smartphone orientation 
 				// in the alpha-beta-gamma axes (units in degrees)
