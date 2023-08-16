@@ -50,6 +50,10 @@ h3 {
 
 .tdcontent {
   padding-left: 200px;
+  width:100%;
+}
+tbody {
+  width:100%;
 }
 
 a:link {

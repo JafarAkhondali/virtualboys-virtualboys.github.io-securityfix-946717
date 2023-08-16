@@ -14,3 +14,7 @@ function isMobile() {
 Number.prototype.clamp = function(min, max) {
 	return Math.min(Math.max(this, min), max);
 };
+
+function logToHTMLLog(line) {
+	document.getElementById('DEBUG_LOG').innerText += line + "\n";
+}

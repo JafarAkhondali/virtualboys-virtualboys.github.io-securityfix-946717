@@ -62,9 +62,11 @@ renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
 
 var mousePos = new THREE.Vector3(.5,.5,0);
+logToHTMLLog('is mobile: ' + isMobile());
 if(isMobile()) {
 	console.log('is mobile');
 	document.getElementById('mobileAccelPermsOverlay').style.display = 'block';
+	logToHTMLLog("req perm func: " + DeviceOrientationEvent.requestPermission);
 	// if (window.DeviceOrientationEvent) {
 	// 	console.log('dev orientation');
 	// 	window.addEventListener("deviceorientation", (event) => {
