@@ -19,8 +19,9 @@
 
 <body>
 	<div id="mobileAccelPermsOverlay" style="  position: fixed; display: none; width: 100%;height: 100%;	top: 0;left: 0;right: 0;bottom: 0;background-color: rgba(0,0,0,1);z-index: 2;">
-
-		<button id="accelPermsButton" onclick="requestAccelerometer()" style="margin: auto; height:50px;">press yes to play with the snake</button>
+		<div id="mobileAccelPermsOverlayContent" style="display: flex; justify-content: center; align-items: center; height: 100%;">
+			<button id="accelPermsButton" onclick="requestAccelerometer()" style="width:300px; height:70px;">press yes to play with the snake</button>
+		</div>
 
 	</div>
 	<canvas id="webGLCanvas" width="100%" height="100%" style="z-index:-1; position:fixed; top:0; left:0"></canvas>
