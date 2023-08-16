@@ -61,11 +61,77 @@ var renderer = new THREE.WebGLRenderer({ antialias: false, canvas: webGLCanvas }
 renderer.setClearColor("#000000");
 renderer.setSize( window.innerWidth, window.innerHeight );
 
+
+const requestAccelerometer = () => {
+	document.getElementById('mobileAccelPermsOverlay').style.display = 'none';
+	if(DeviceMotionEvent && DeviceMotionEvent.requestPermission) {
+		
+		DeviceMotionEvent.requestPermission().then(response => {
+			if (response == 'granted') {
+			// Add a listener to get smartphone orientation 
+				// in the alpha-beta-gamma axes (units in degrees)
+				let lastXRot = 0;
+				let lastYRot = 0;
+				let didInitRot = false;
+				const rotScale = .01;
+				window.addEventListener('deviceorientation',(event) => {
+					const xRot = event.gamma;
+					const yRot = event.beta;
+					if(!didInitRot) {
+						lastXRot = xRot;
+						lastYRot = yRot;
+						didInitRot = true;
+					}
+					const dXRot = xRot - lastXRot;
+					const dYRot = yRot - lastYRot;
+					lastXRot = xRot;
+					lastYRot = yRot;
+					// Expose each orientation angle in a more readable way
+					// rotation_degrees = event.alpha;
+					// frontToBack_degrees = event.beta;
+					// leftToRight_degrees = event.gamma;
+					
+					// console.log('drot: ', dXRot, ' ', dYRot);
+					mousePos.x += dXRot * rotScale;
+					mousePos.x = mousePos.x.clamp(0, 1);
+					mousePos.y += dYRot * rotScale;
+					mousePos.y = mousePos.y.clamp(0, 1); 
+					// Update velocity according to how tilted the phone is
+					// Since phones are narrower than they are long, double the increase to the x velocity
+					// vx = vx + leftToRight_degrees * updateRate*2; 
+					// vy = vy + frontToBack_degrees * updateRate;
+					
+					// // Update position and clip it to bounds
+					// px = px + vx*.5;
+					// if (px > 98 || px < 0){ 
+					// 	px = Math.max(0, Math.min(98, px)) // Clip px between 0-98
+					// 	vx = 0;
+					// }
+
+					// py = py + vy*.5;
+					// if (py > 98 || py < 0){
+					// 	py = Math.max(0, Math.min(98, py)) // Clip py between 0-98
+					// 	vy = 0;
+					// }
+					
+					// dot = document.getElementsByClassName("indicatorDot")[0]
+					// dot.setAttribute('style', "left:" + (px) + "%;" +
+					// 								"top:" + (py) + "%;");
+					
+				});
+			}
+		});
+	} else {
+		console.log('no device motion event!');
+	}
+}
+
 var mousePos = new THREE.Vector3(.5,.5,0);
 logToHTMLLog('is mobile: ' + isMobile());
 if(isMobile()) {
 	console.log('is mobile');
 	document.getElementById('mobileAccelPermsOverlay').style.display = 'block';
+	requestAccelerometer();
 	logToHTMLLog("req perm func: " + DeviceOrientationEvent.requestPermission);
 	// if (window.DeviceOrientationEvent) {
 	// 	console.log('dev orientation');
@@ -95,73 +161,13 @@ if(isMobile()) {
 }
 
 const onTilt = (x, y) => {
-	console.log('on tilt: ', x, y);
+	// console.log('on tilt: ', x, y);
 	if(x && y) {
 		mousePos.x += x * .1;
 		mousePos.x = mousePos.x.clamp(0, 1);
 		mousePos.y += y * .1;
 		mousePos.y = mousePos.y.clamp(0, 1); 
 	}
-}
-
-const requestAccelerometer = () => {
-	document.getElementById('mobileAccelPermsOverlay').style.display = 'none';
-	DeviceMotionEvent.requestPermission().then(response => {
-		if (response == 'granted') {
-		// Add a listener to get smartphone orientation 
-			// in the alpha-beta-gamma axes (units in degrees)
-			let lastXRot = 0;
-			let lastYRot = 0;
-			let didInitRot = false;
-			const rotScale = .01;
-			window.addEventListener('deviceorientation',(event) => {
-				const xRot = event.gamma;
-				const yRot = event.beta;
-				if(!didInitRot) {
-					lastXRot = xRot;
-					lastYRot = yRot;
-					didInitRot = true;
-				}
-				const dXRot = xRot - lastXRot;
-				const dYRot = yRot - lastYRot;
-				lastXRot = xRot;
-				lastYRot = yRot;
-				// Expose each orientation angle in a more readable way
-				// rotation_degrees = event.alpha;
-				// frontToBack_degrees = event.beta;
-				// leftToRight_degrees = event.gamma;
-				
-				console.log('drot: ', dXRot, ' ', dYRot);
-				mousePos.x += dXRot * rotScale;
-				mousePos.x = mousePos.x.clamp(0, 1);
-				mousePos.y += dYRot * rotScale;
-				mousePos.y = mousePos.y.clamp(0, 1); 
-				// Update velocity according to how tilted the phone is
-				// Since phones are narrower than they are long, double the increase to the x velocity
-				// vx = vx + leftToRight_degrees * updateRate*2; 
-				// vy = vy + frontToBack_degrees * updateRate;
-				
-				// // Update position and clip it to bounds
-				// px = px + vx*.5;
-				// if (px > 98 || px < 0){ 
-				// 	px = Math.max(0, Math.min(98, px)) // Clip px between 0-98
-				// 	vx = 0;
-				// }
-
-				// py = py + vy*.5;
-				// if (py > 98 || py < 0){
-				// 	py = Math.max(0, Math.min(98, py)) // Clip py between 0-98
-				// 	vy = 0;
-				// }
-				
-				// dot = document.getElementsByClassName("indicatorDot")[0]
-				// dot.setAttribute('style', "left:" + (px) + "%;" +
-				// 								"top:" + (py) + "%;");
-				
-			});
-		}
-	});
-
 }
 
 var world = new CANNON.World();

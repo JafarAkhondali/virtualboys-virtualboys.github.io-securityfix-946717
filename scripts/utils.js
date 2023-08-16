@@ -16,5 +16,6 @@ Number.prototype.clamp = function(min, max) {
 };
 
 function logToHTMLLog(line) {
+	console.log(line);
 	document.getElementById('DEBUG_LOG').innerText += line + "\n";
 }
