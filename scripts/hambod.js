@@ -119,6 +119,8 @@ const requestAccelerometer = () => {
 					// 								"top:" + (py) + "%;");
 					
 				});
+			} else {
+				logToHTMLLog('perm not granted');
 			}
 		});
 	} else {
@@ -131,7 +133,9 @@ logToHTMLLog('is mobile: ' + isMobile());
 if(isMobile()) {
 	console.log('is mobile');
 	document.getElementById('mobileAccelPermsOverlay').style.display = 'block';
-	requestAccelerometer();
+
+	// requestAccelerometer();
+
 	logToHTMLLog("req perm func: " + DeviceOrientationEvent.requestPermission);
 	// if (window.DeviceOrientationEvent) {
 	// 	console.log('dev orientation');
