@@ -13,6 +13,7 @@
  /* Hides from IE-mac \*/ * html .clear { height: 1%; } .clear { display: block; } /* End hide from IE-mac */
 
  body {
+  background-color: black;
   font-family: Arial;
   font-size: 20;
   margin-top: 20px;
@@ -70,6 +71,7 @@ table {
 .game-content {
   width:50%;
   text-align: left;
+  min-width: 600px;
 }
 .control-panel {
   width:auto;
@@ -81,5 +83,4 @@ table {
   font-family: Alagard;
   font-size: 100;
 }
-
 
